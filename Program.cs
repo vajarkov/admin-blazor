@@ -1,8 +1,12 @@
-using admin_blazor.Data;
-using Microsoft.EntityFrameworkCore;
-using MySqlConnector;
+
+using System.Security.Claims;
 using admin_blazor.Components;
+using admin_blazor.Data;
 using admin_blazor.Services;
+using Microsoft.AspNetCore.Antiforgery;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -16,59 +20,117 @@ builder.Services.AddDbContext<AppDbContext>(options =>
         connectionString,
         ServerVersion.AutoDetect(connectionString)));
 
-// Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
 builder.Services.AddScoped<UserService>();
+builder.Services.AddScoped<AuthService>();
+
+builder.Services
+    .AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+    .AddCookie(options =>
+    {
+        options.LoginPath = "/login";
+        options.AccessDeniedPath = "/access-denied";
+        options.Cookie.Name = "LevelEnglish.Admin";
+        options.Cookie.HttpOnly = true;
+        options.Cookie.SameSite = SameSiteMode.Lax;
+        options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+        options.ExpireTimeSpan = TimeSpan.FromHours(8);
+        options.SlidingExpiration = true;
+    });
+
+builder.Services.AddAuthorization();
+builder.Services.AddAntiforgery();
 
 var app = builder.Build();
 
-app.MapGet("/db-check", async (IConfiguration config) =>
-{
-    var connectionString = config.GetConnectionString("LevelEnglish");
-
-    await using var connection = new MySqlConnection(connectionString);
-    await connection.OpenAsync();
-
-    await using var command = new MySqlCommand(
-        "SELECT COUNT(*) FROM users", connection);
-
-    var count = await command.ExecuteScalarAsync();
-
-    return Results.Ok(new { connected = true, users = count });
-});
-
-app.MapGet("/db-check-ef", async (AppDbContext db) =>
-{
-    var count = await db.Users.CountAsync();
-
-    var users = await db.Users
-        .AsNoTracking()
-        .OrderBy(u => u.Id)
-        .Take(5)
-        .Select(u => new { u.Id, u.Name, u.Surname, u.UserType })
-        .ToListAsync();
-
-    return Results.Ok(new { count, users });
-});
-
-
-
-// Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
-    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
     app.UseHsts();
 }
 
 app.UseHttpsRedirection();
-
-
+app.UseAuthentication();
+app.UseAuthorization();
 app.UseAntiforgery();
 
+app.MapGet("/auth/antiforgery", (
+    HttpContext context,
+    IAntiforgery antiforgery) =>
+{
+    var tokens = antiforgery.GetAndStoreTokens(context);
+
+    return Results.Ok(new
+    {
+        token = tokens.RequestToken
+    });
+});
+
+app.MapPost("/auth/login", async (
+    HttpContext context,
+    AuthService auth,
+    IAntiforgery antiforgery) =>
+{
+    try
+    {
+        await antiforgery.ValidateRequestAsync(context);
+    }
+    catch (AntiforgeryValidationException)
+    {
+        return Results.BadRequest(
+            "Недействительный токен безопасности. Обновите страницу и попробуйте снова.");
+    }
+
+    var form = await context.Request.ReadFormAsync();
+
+    var phone = form["Phone"].ToString();
+    var password = form["Password"].ToString();
+
+    if (string.IsNullOrWhiteSpace(phone) ||
+        string.IsNullOrEmpty(password))
+    {
+        return Results.BadRequest("Введите телефон и пароль.");
+    }
+
+    var user = await auth.ValidateAdminAsync(phone, password);
+
+    if (user is null)
+    {
+        return Results.Redirect("/login?error=1");
+    }
+
+    var claims = new[]
+    {
+        new Claim(
+            ClaimTypes.NameIdentifier,
+            user.Id.ToString()),
+
+        new Claim(
+            ClaimTypes.Name,
+            user.Phone?.ToString("0") ?? ""),
+
+        new Claim(
+            ClaimTypes.Role,
+            "Admin")
+    };
+
+    var identity = new ClaimsIdentity(
+        claims,
+        CookieAuthenticationDefaults.AuthenticationScheme);
+
+    var principal = new ClaimsPrincipal(identity);
+
+    await context.SignInAsync(
+        CookieAuthenticationDefaults.AuthenticationScheme,
+        principal);
+
+    return Results.Redirect("/");
+});
+
 app.MapStaticAssets();
+
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
