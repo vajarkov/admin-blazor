@@ -1,7 +1,57 @@
-﻿@page "/"
+﻿
+@page "/"
+@using admin_blazor.Data
+@using Microsoft.EntityFrameworkCore
+@inject AppDbContext Db
 
-<PageTitle>Home</PageTitle>
+<PageTitle>Проверка базы данных</PageTitle>
 
-<h1>Hello, world!</h1>
+<h1>Пользователи</h1>
 
-Welcome to your new app.
+@if (users is null)
+{
+    <p>Загрузка...</p>
+}
+else
+{
+    <p>Всего записей: @users.Count</p>
+
+    <table class="table">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Имя</th>
+                <th>Фамилия</th>
+                <th>Тип пользователя</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var user in users)
+            {
+                <tr>
+                    <td>@user.Id</td>
+                    <td>@user.Name</td>
+                    <td>@user.Surname</td>
+                    <td>@user.UserType</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<UserRow>? users;
+
+    protected override async Task OnInitializedAsync()
+    {
+        users = await Db.Users
+            .AsNoTracking()
+            .OrderBy(u => u.Id)
+            .Select(u => new UserRow(
+                u.Id, u.Name, u.Surname, u.UserType))
+            .ToListAsync();
+    }
+
+    private record UserRow(
+        uint Id, string? Name, string? Surname, uint? UserType);
+}

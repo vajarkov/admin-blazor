@@ -1,0 +1,15 @@
+services:
+  db:
+    image: mysql:8.0.42
+    container_name: leveleng-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: leveleng
+    ports:
+      - "127.0.0.1:3307:3306"
+    volumes:
+      - leveleng_mysql_data:/var/lib/mysql
+
+volumes:
+  leveleng_mysql_data:
