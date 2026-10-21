@@ -1,0 +1,67 @@
+@page "/login"
+@rendermode InteractiveServer
+@using System.ComponentModel.DataAnnotations
+@using admin_blazor.Services
+@inject AuthService Auth
+
+<PageTitle>Вход в систему</PageTitle>
+
+<div class="login-container">
+    <h1>Вход в систему</h1>
+
+    <EditForm Model="@model" OnValidSubmit="@HandleLogin" FormName="AdminLogin">
+        <DataAnnotationsValidator />
+
+        <div class="mb-3">
+            <div class="mb-3">
+                <label for="phone" class="form-label">Номер телефона</label>
+                <InputText id="phone" class="form-control" @bind-Value="model.Phone" type="tel" inputmode="tel"
+                           autocomplete="username" placeholder="+7 (___) ___-__-__" />
+            </div>
+        </div>
+
+        <div class="mb-3">
+            <label for="password" class="form-label">Пароль</label>
+            <InputText id="password" type="password" class="form-control" @bind-Value="model.Password"
+                       placeholder="Введите пароль" />
+        </div>
+
+        <button type="submit" class="btn btn-primary w-100">
+            Войти
+        </button>
+    </EditForm>
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger mt-3" role="alert">
+            @errorMessage
+        </div>
+    }
+</div>
+
+@code {
+    private LoginModel model = new();
+    private string? errorMessage;
+
+    private async Task HandleLogin()
+    {
+        errorMessage = null;
+
+        var valid = await Auth.ValidateAdminAsync(
+            model.Phone,
+            model.Password);
+
+        if (valid is null)
+        {
+            errorMessage = "Неверный номер телефона или пароль.";
+            return;
+        }
+
+        errorMessage = "Пароль верный. Серверная авторизация ещё не подключена.";
+    }
+
+    private sealed class LoginModel
+    {
+        public string Phone { get; set; } = "";
+        public string Password { get; set; } = "";
+    }
+}

@@ -22,6 +22,7 @@ else
                 <th>ID</th>
                 <th>Имя</th>
                 <th>Фамилия</th>
+                <th>Номер телефона</th>
                 <th>Тип пользователя</th>
             </tr>
         </thead>
@@ -32,6 +33,7 @@ else
                     <td>@user.Id</td>
                     <td>@user.Name</td>
                     <td>@user.Surname</td>
+                    <td>@user.Phone</td>
                     <td>@user.UserType</td>
                 </tr>
             }
@@ -48,10 +50,10 @@ else
             .AsNoTracking()
             .OrderBy(u => u.Id)
             .Select(u => new UserRow(
-                u.Id, u.Name, u.Surname, u.UserType))
+                u.Id, u.Name, u.Surname, u.Phone, u.UserType))
             .ToListAsync();
     }
 
     private record UserRow(
-        uint Id, string? Name, string? Surname, uint? UserType);
+        uint Id, string? Name, string? Surname, double? Phone, uint? UserType);
 }
