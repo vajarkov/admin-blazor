@@ -1,4 +1,3 @@
-
 using System.Security.Claims;
 using admin_blazor.Components;
 using admin_blazor.Data;
@@ -42,6 +41,8 @@ builder.Services
 
 builder.Services.AddAuthorization();
 builder.Services.AddAntiforgery();
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddCascadingAuthenticationState();
 
 var app = builder.Build();
 
@@ -128,6 +129,16 @@ app.MapPost("/auth/login", async (
 
     return Results.Redirect("/");
 });
+
+
+app.MapPost("/auth/logout", async (HttpContext context) =>
+{
+    await context.SignOutAsync(
+        CookieAuthenticationDefaults.AuthenticationScheme);
+
+    return Results.Redirect("/login");
+});
+
 
 app.MapStaticAssets();
 

@@ -1,5 +1,6 @@
 ﻿
 @page "/"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
 @using admin_blazor.Data
 @using Microsoft.EntityFrameworkCore
 @inject AppDbContext Db
