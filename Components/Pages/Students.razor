@@ -1,0 +1,382 @@
+@page "/students"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin")]
+@using admin_blazor.Data
+@using admin_blazor.Models
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Components.Web
+@inject AppDbContext Db
+
+<PageTitle>Студенты</PageTitle>
+
+<div class="container-fluid py-3">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+        <div>
+            <h1 class="h3 mb-1">Студенты</h1>
+            <div class="text-muted">Всего записей: @FilteredStudents.Count</div>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(loadError))
+    {
+        <div class="alert alert-danger" role="alert">@loadError</div>
+    }
+    else if (isLoading)
+    {
+        <div class="d-flex align-items-center gap-2 text-muted py-4">
+            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+            <span>Загрузка студентов…</span>
+        </div>
+    }
+    else
+    {
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <div class="row g-3 align-items-end mb-3">
+                    <div class="col-12 col-md-7 col-lg-6">
+                        <label for="studentSearch" class="form-label">Поиск по ФИО или номеру телефона</label>
+                        <input id="studentSearch"
+                               class="form-control"
+                               type="search"
+                               placeholder="Введите имя, фамилию или телефон"
+                               @bind="searchText"
+                               @bind:event="oninput" />
+                    </div>
+                    <div class="col-6 col-md-3 col-lg-2">
+                        <label for="pageSize" class="form-label">На странице</label>
+                        <select id="pageSize" class="form-select" @bind="pageSize" @bind:after="ResetPage">
+                            <option value="25">25</option>
+                            <option value="50">50</option>
+                            <option value="100">100</option>
+                        </select>
+                    </div>
+                    <div class="col-6 col-md-2 col-lg-4 text-md-end">
+                        <button type="button" class="btn btn-outline-secondary" @onclick="ClearSearch">
+                            Сбросить поиск
+                        </button>
+                    </div>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-hover table-striped align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th scope="col" class="text-nowrap">ID</th>
+                                <th scope="col" class="text-nowrap"><button type="button" class="btn btn-link link-dark text-decoration-none p-0 fw-bold" @onclick="() => SortBy(nameof(User.Name))">ФИО @SortMark(nameof(User.Name))</button></th>
+                                <th scope="col" class="text-nowrap"><button type="button" class="btn btn-link link-dark text-decoration-none p-0 fw-bold" @onclick="() => SortBy(nameof(User.Phone))">Номер телефона @SortMark(nameof(User.Phone))</button></th>
+                                <th scope="col" class="text-nowrap"><button type="button" class="btn btn-link link-dark text-decoration-none p-0 fw-bold" @onclick="() => SortBy(nameof(User.Balance))">Баланс @SortMark(nameof(User.Balance))</button></th>
+                                <th scope="col" class="text-nowrap">Статус</th>
+                                <th scope="col" class="text-nowrap">Тип аккаунта</th>
+                                <th scope="col" class="text-nowrap">Войти</th>
+                                <th scope="col" class="text-nowrap">Действие</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (PageStudents.Count == 0)
+                            {
+                                <tr>
+                                    <td colspan="8" class="text-center text-muted py-4">Студенты не найдены</td>
+                                </tr>
+                            }
+                            else
+                            {
+                                @foreach (var student in PageStudents)
+                                {
+                                    <tr @key="student.Id">
+                                        <td>@student.Id</td>
+                                        <td>@FullName(student)</td>
+                                        <td>@FormatPhone(student.Phone)</td>
+                                        <td class="student-balance-cell"
+                                            title="Двойной щелчок — изменить баланс"
+                                            @ondblclick="() => StartBalanceEdit(student)">
+                                            @if (editingBalanceStudentId == student.Id)
+                                            {
+                                                <input class="form-control form-control-sm student-balance-input"
+                                                       type="text"
+                                                       inputmode="decimal"
+                                                       aria-label="Новый баланс"
+                                                       @bind="editingBalanceValue"
+                                                       @bind:event="oninput"
+                                                       @onkeydown="HandleBalanceKeyDownAsync"
+                                                       @onblur="CancelBalanceEdit" />
+                                            }
+                                            else
+                                            {
+                                                <span class="student-balance-value">@(string.IsNullOrWhiteSpace(student.Balance) ? "—" : student.Balance)</span>
+                                            }
+                                        </td>
+                                        <td>
+                                            @if (student.Verify == 1)
+                                            {
+                                                <span class="badge text-bg-success">Верифицирован</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge text-bg-secondary">Не верифицирован</span>
+                                            }
+                                        </td>
+                                        <td>@StudentTypeLabel(student.StudentType)</td>
+                                        <td>
+                                            <a class="btn btn-sm btn-outline-primary"
+                                               href="https://student.level-english.kz/newlogin.php?user=@student.Id"
+                                               target="_blank" rel="noopener noreferrer">
+                                                Войти
+                                            </a>
+                                        </td>
+                                        <td>
+                                            <a class="btn btn-sm btn-outline-secondary" href="/students/@student.Id">
+                                                Подробнее
+                                            </a>
+                                        </td>
+                                    </tr>
+                                }
+                            }
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mt-3">
+                    <div class="text-muted small">
+                        @if (FilteredStudents.Count == 0)
+                        {
+                            <span>Показано 0 из 0</span>
+                        }
+                        else
+                        {
+                            <span>Показано @((CurrentPage - 1) * pageSize + 1)–@Math.Min(CurrentPage * pageSize, FilteredStudents.Count) из @FilteredStudents.Count</span>
+                        }
+                    </div>
+                    <nav aria-label="Страницы списка студентов">
+                        <ul class="pagination pagination-sm mb-0">
+                            <li class="page-item @(CurrentPage <= 1 ? "disabled" : "")">
+                                <button type="button" class="page-link" disabled="@(CurrentPage <= 1)" @onclick="() => GoToPage(CurrentPage - 1)">Назад</button>
+                            </li>
+                            @foreach (var page in VisiblePages)
+                            {
+                                <li class="page-item @(page == CurrentPage ? "active" : "")" @key="page">
+                                    <button type="button" class="page-link" @onclick="() => GoToPage(page)">@(page)</button>
+                                </li>
+                            }
+                            <li class="page-item @(CurrentPage >= TotalPages ? "disabled" : "")">
+                                <button type="button" class="page-link" disabled="@(CurrentPage >= TotalPages)" @onclick="() => GoToPage(CurrentPage + 1)">Вперёд</button>
+                            </li>
+                        </ul>
+                    </nav>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@if (!string.IsNullOrWhiteSpace(balanceEditMessage))
+{
+    <div class="container-fluid">
+        <div class="alert @(balanceEditMessage.StartsWith("Не удалось", StringComparison.Ordinal) || balanceEditMessage.StartsWith("Введите", StringComparison.Ordinal) || balanceEditMessage.StartsWith("Студент", StringComparison.Ordinal) ? "alert-danger" : "alert-success")" role="status">@balanceEditMessage</div>
+    </div>
+}
+
+@code {
+    private List<User> students = [];
+    private bool isLoading = true;
+    private string? loadError;
+    private string searchText = string.Empty;
+    private int pageSize = 100;
+    private int currentPage = 1;
+    private string sortColumn = nameof(User.Id);
+    private bool sortAscending = true;
+    private uint? editingBalanceStudentId;
+    private string editingBalanceValue = string.Empty;
+    private string? balanceEditMessage;
+
+    private List<User> FilteredStudents
+    {
+        get
+        {
+            IEnumerable<User> query = students;
+            var term = searchText.Trim();
+
+            if (!string.IsNullOrWhiteSpace(term))
+            {
+                var normalizedTerm = term.ToLowerInvariant();
+                var phoneTerm = new string(term.Where(char.IsDigit).ToArray());
+
+                query = query.Where(student =>
+                    FullName(student).Contains(normalizedTerm, StringComparison.OrdinalIgnoreCase)
+                    || (!string.IsNullOrWhiteSpace(phoneTerm)
+                        && FormatPhone(student.Phone).Contains(phoneTerm, StringComparison.OrdinalIgnoreCase)));
+            }
+
+            query = sortColumn switch
+            {
+                nameof(User.Name) => sortAscending
+                    ? query.OrderBy(student => FullName(student), StringComparer.OrdinalIgnoreCase)
+                    : query.OrderByDescending(student => FullName(student), StringComparer.OrdinalIgnoreCase),
+                nameof(User.Phone) => sortAscending
+                    ? query.OrderBy(student => student.Phone)
+                    : query.OrderByDescending(student => student.Phone),
+                nameof(User.Balance) => sortAscending
+                    ? query.OrderBy(student => ParseBalance(student.Balance))
+                    : query.OrderByDescending(student => ParseBalance(student.Balance)),
+                _ => sortAscending
+                    ? query.OrderBy(student => student.Id)
+                    : query.OrderByDescending(student => student.Id)
+            };
+
+            return query.ToList();
+        }
+    }
+
+    private List<User> PageStudents
+    {
+        get
+        {
+            var list = FilteredStudents;
+            var totalPages = Math.Max(1, (int)Math.Ceiling(list.Count / (double)pageSize));
+            if (currentPage > totalPages)
+                currentPage = totalPages;
+            if (currentPage < 1)
+                currentPage = 1;
+
+            return list.Skip((currentPage - 1) * pageSize).Take(pageSize).ToList();
+        }
+    }
+
+    private int CurrentPage => currentPage;
+    private int TotalPages => Math.Max(1, (int)Math.Ceiling(FilteredStudents.Count / (double)pageSize));
+    private IEnumerable<int> VisiblePages => Enumerable.Range(Math.Max(1, CurrentPage - 2), Math.Min(5, TotalPages) )
+        .Select(offset => Math.Min(offset, TotalPages))
+        .Distinct()
+        .OrderBy(page => page);
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            students = await Db.Users
+                .AsNoTracking()
+                .Where(user => user.UserType != 3)
+                .ToListAsync();
+        }
+        catch (Exception ex)
+        {
+            loadError = $"Не удалось загрузить список студентов: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private static string FullName(User student)
+    {
+        var name = string.Join(" ", new[] { student.Name, student.Surname }
+            .Where(part => !string.IsNullOrWhiteSpace(part)));
+        return string.IsNullOrWhiteSpace(name) ? "—" : name;
+    }
+
+    private static string FormatPhone(double? phone) =>
+        phone.HasValue ? phone.Value.ToString("0", System.Globalization.CultureInfo.InvariantCulture) : "—";
+
+    private static string StudentTypeLabel(uint? studentType) => studentType == 1 ? "Индивидуальный" : "Групповой";
+
+    private static decimal ParseBalance(string? balance) =>
+        decimal.TryParse(balance, System.Globalization.NumberStyles.Number,
+            System.Globalization.CultureInfo.InvariantCulture, out var value) ? value : 0m;
+
+    private string SortMark(string column) => sortColumn != column ? "↕" : sortAscending ? "↑" : "↓";
+
+    private void SortBy(string column)
+    {
+        if (sortColumn == column)
+            sortAscending = !sortAscending;
+        else
+        {
+            sortColumn = column;
+            sortAscending = true;
+        }
+        currentPage = 1;
+    }
+
+    private void GoToPage(int page)
+    {
+        currentPage = Math.Clamp(page, 1, TotalPages);
+    }
+
+    private void ResetPage() => currentPage = 1;
+
+    private void ClearSearch()
+    {
+        searchText = string.Empty;
+        currentPage = 1;
+    }
+
+    private void StartBalanceEdit(User student)
+    {
+        editingBalanceStudentId = student.Id;
+        editingBalanceValue = student.Balance ?? "0";
+        balanceEditMessage = null;
+    }
+
+    private async Task HandleBalanceKeyDownAsync(KeyboardEventArgs args)
+    {
+        if (args.Key == "Enter")
+        {
+            await SaveBalanceAsync();
+        }
+        else if (args.Key == "Escape")
+        {
+            CancelBalanceEdit();
+        }
+    }
+
+    private void CancelBalanceEdit()
+    {
+        editingBalanceStudentId = null;
+        editingBalanceValue = string.Empty;
+    }
+
+    private async Task SaveBalanceAsync()
+    {
+        if (editingBalanceStudentId is not uint studentId)
+            return;
+
+        var normalizedValue = editingBalanceValue.Trim().Replace(',', '.');
+        if (!decimal.TryParse(normalizedValue,
+                System.Globalization.NumberStyles.AllowLeadingSign | System.Globalization.NumberStyles.AllowDecimalPoint,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out var newBalance) || newBalance < 0)
+        {
+            balanceEditMessage = "Введите корректный неотрицательный баланс.";
+            return;
+        }
+
+        // Сбрасываем режим редактирования до обращения к базе,
+        // чтобы событие blur не отменило сохранение.
+        editingBalanceStudentId = null;
+        editingBalanceValue = string.Empty;
+
+        try
+        {
+            var student = await Db.Users.FirstOrDefaultAsync(user => user.Id == studentId);
+            if (student is null)
+            {
+                balanceEditMessage = $"Студент с ID {studentId} не найден.";
+                return;
+            }
+
+            student.Balance = newBalance.ToString(
+                "0.############################",
+                System.Globalization.CultureInfo.InvariantCulture);
+            await Db.SaveChangesAsync();
+
+            var listStudent = students.FirstOrDefault(user => user.Id == studentId);
+            if (listStudent is not null)
+                listStudent.Balance = student.Balance;
+
+            balanceEditMessage = $"Баланс студента {studentId} сохранён.";
+        }
+        catch (Exception ex)
+        {
+            balanceEditMessage = $"Не удалось сохранить баланс: {ex.Message}";
+        }
+    }
+}

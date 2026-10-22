@@ -10,6 +10,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<User> Users => Set<User>();
     public DbSet<Config> Configs => Set<Config>();
     public DbSet<Logspay> Logspays => Set<Logspay>();
+    public DbSet<Teacher> Teachers => Set<Teacher>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -55,6 +56,27 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
             entity.Property(l => l.Cancellation).HasColumnName("cancellation");
             entity.Property(l => l.Lvl).HasColumnName("lvl");
             entity.Property(l => l.Kzt).HasColumnName("kzt");
+        });
+
+        modelBuilder.Entity<Teacher>(entity =>
+        {
+            entity.ToTable("teacher");
+            entity.HasKey(t => t.Id);
+
+            entity.Property(t => t.Id).HasColumnName("id");
+            entity.Property(t => t.Login).HasColumnName("login");
+            entity.Property(t => t.Education).HasColumnName("education");
+            entity.Property(t => t.Expert).HasColumnName("expert");
+            entity.Property(t => t.Password).HasColumnName("password");
+            entity.Property(t => t.Description).HasColumnName("description");
+            entity.Property(t => t.Youtube).HasColumnName("youtube");
+            entity.Property(t => t.Cabinet).HasColumnName("cabinet");
+            entity.Property(t => t.Price).HasColumnName("price");
+            entity.Property(t => t.Avatar).HasColumnName("avatar");
+            entity.Property(t => t.Price1).HasColumnName("price1");
+            entity.Property(t => t.Price2).HasColumnName("price2");
+            entity.Property(t => t.Price3).HasColumnName("price3");
+            entity.Property(t => t.Telegram).HasColumnName("telegram");
         });
     }
 }

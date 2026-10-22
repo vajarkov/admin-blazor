@@ -1,0 +1,370 @@
+@page "/students/{Id:int}"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin")]
+
+@using admin_blazor.Data
+@using admin_blazor.Models
+@using Microsoft.EntityFrameworkCore
+@using System.Globalization
+
+@inject AppDbContext Db
+
+<PageTitle>Карточка студента</PageTitle>
+
+<div class="container-fluid py-3">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+        <div>
+            <h1 class="h3 mb-1">Карточка студента</h1>
+            <div class="text-muted">ID: @Id</div>
+        </div>
+
+        <a class="btn btn-outline-secondary" href="/students">
+            Назад к списку
+        </a>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="d-flex align-items-center gap-2 text-muted py-4">
+            <span class="spinner-border spinner-border-sm" role="status"
+                  aria-hidden="true"></span>
+            <span>Загрузка данных студента…</span>
+        </div>
+    }
+    else if (!string.IsNullOrWhiteSpace(loadError))
+    {
+        <div class="alert alert-danger" role="alert">@loadError</div>
+    }
+    else if (student is not null)
+    {
+        <div class="row g-4">
+            <div class="col-12 col-lg-4">
+                <div class="card shadow-sm h-100">
+                    <div class="card-body text-center p-4">
+                        @if (!string.IsNullOrWhiteSpace(student.Avatar))
+                        {
+                            <img src="@($"https://student.level-english.kz/assets/images/user/{Uri.EscapeDataString(student.Avatar)}")"
+                                 alt="Аватар студента"
+                                 class="rounded-circle border mb-3"
+                                 width="160"
+                                 height="160"
+                                 style="object-fit: cover;" />
+                        }
+                        else
+                        {
+                            <div class="rounded-circle border mb-3 d-inline-flex align-items-center justify-content-center bg-body-secondary"
+                                 style="width: 160px; height: 160px; font-size: 3rem;">
+                                <span>@GetInitials(student)</span>
+                            </div>
+                        }
+
+                        <h2 class="h4 mb-2">@FullName(student)</h2>
+
+                        <div class="text-muted mb-3">
+                            @FormatPhone(student.Phone)
+                        </div>
+
+                        <div class="mb-2">
+                            @if (student.Verify == 1)
+                            {
+                                <span class="badge text-bg-success">Верифицирован</span>
+                            }
+                            else
+                            {
+                                <span class="badge text-bg-secondary">Не верифицирован</span>
+                            }
+                        </div>
+
+                        <div>
+                            @if (draftBan == 1)
+                            {
+                                <span class="badge text-bg-success">Аккаунт активен</span>
+                            }
+                            else
+                            {
+                                <span class="badge text-bg-danger">Аккаунт заблокирован</span>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 col-lg-8">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-body">
+                        <h2 class="h5 mb-0">Настройки аккаунта</h2>
+                    </div>
+
+                    <div class="card-body">
+                        <form @onsubmit="SaveAsync" @onsubmit:preventDefault>
+                            <div class="mb-4">
+                                <label for="studentBalance" class="form-label">
+                                    Баланс LVL
+                                </label>
+                                <input id="studentBalance"
+                                       class="form-control"
+                                       type="text"
+                                       inputmode="decimal"
+                                       @bind="draftBalance"
+                                       @bind:event="oninput" />
+                            </div>
+
+                            <div class="mb-4">
+                                <label for="studentType" class="form-label">
+                                    Учётная запись
+                                </label>
+                                <select id="studentType"
+                                        class="form-select"
+                                        @bind="draftStudentType">
+                                    <option value="1">Индивидуальная учётная запись</option>
+                                    <option value="0">Групповая учётная запись</option>
+                                </select>
+                            </div>
+
+                            <div class="mb-4">
+                                <label for="userType" class="form-label">
+                                    Роль пользователя
+                                </label>
+                                <select id="userType"
+                                        class="form-select"
+                                        @bind="draftUserType">
+                                    <option value="1">Пользователь</option>
+                                    <option value="0">Администратор</option>
+                                    <option value="2">Менеджер</option>
+                                </select>
+                            </div>
+
+                            <div class="mb-4">
+                                <label for="banType" class="form-label">
+                                    Доступ к аккаунту
+                                </label>
+                                <select id="banType"
+                                        class="form-select"
+                                        @bind="draftBan">
+                                    <option value="0">Заблокировать</option>
+                                    <option value="1">Разблокировать</option>
+                                </select>
+                            </div>
+
+                            @if (!string.IsNullOrWhiteSpace(saveMessage))
+                            {
+                                <div class="alert @(saveSucceeded ? "alert-success" : "alert-danger")"
+                                     role="status">
+                                    @saveMessage
+                                </div>
+                            }
+
+                            <div class="d-flex flex-wrap gap-2">
+                                <button type="submit"
+                                        class="btn btn-primary"
+                                        disabled="@isSaving">
+                                    @if (isSaving)
+                                    {
+                                        <span class="spinner-border spinner-border-sm me-2"
+                                              aria-hidden="true"></span>
+                                        <span>Сохранение…</span>
+                                    }
+                                    else
+                                    {
+                                        <span>Сохранить</span>
+                                    }
+                                </button>
+
+                                <button type="button"
+                                        class="btn btn-outline-secondary"
+                                        disabled="@isSaving"
+                                        @onclick="ResetChanges">
+                                    Отменить изменения
+                                </button>
+
+                                <a class="btn btn-outline-secondary ms-lg-auto"
+                                   href="/students">
+                                    К списку студентов
+                                </a>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    private User? student;
+
+    private bool isLoading = true;
+    private bool isSaving;
+    private bool saveSucceeded;
+    private string? loadError;
+    private string? saveMessage;
+
+    private string draftBalance = "0";
+    private uint draftStudentType;
+    private uint draftUserType;
+    private byte draftBan;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        isLoading = true;
+        loadError = null;
+        saveMessage = null;
+
+        try
+        {
+            student = await Db.Users
+                .AsNoTracking()
+                .FirstOrDefaultAsync(user => user.Id == Id);
+
+            if (student is null)
+            {
+                loadError = $"Студент с ID {Id} не найден.";
+                return;
+            }
+
+            LoadDraftFromStudent();
+        }
+        catch (Exception ex)
+        {
+            loadError = $"Не удалось загрузить данные студента: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void LoadDraftFromStudent()
+    {
+        if (student is null)
+            return;
+
+        draftBalance = student.Balance ?? "0";
+        draftStudentType = student.StudentType ?? 0;
+        draftUserType = student.UserType ?? 1;
+        draftBan = student.Ban ?? 1;
+    }
+
+    private async Task SaveAsync()
+    {
+        if (student is null || isSaving)
+            return;
+
+        saveMessage = null;
+        saveSucceeded = false;
+
+        var normalizedBalance = draftBalance.Trim().Replace(',', '.');
+
+        if (!decimal.TryParse(
+                normalizedBalance,
+                NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint,
+                CultureInfo.InvariantCulture,
+                out var balance)
+            || balance < 0)
+        {
+            saveMessage = "Введите корректный неотрицательный баланс.";
+            return;
+        }
+
+        if (draftStudentType is not (0 or 1))
+        {
+            saveMessage = "Выбран неизвестный тип учётной записи.";
+            return;
+        }
+
+        if (draftUserType is not (0 or 1 or 2))
+        {
+            saveMessage = "Выбрана неизвестная роль пользователя.";
+            return;
+        }
+
+        if (draftBan is not (0 or 1))
+        {
+            saveMessage = "Выбрано неизвестное состояние блокировки.";
+            return;
+        }
+
+        isSaving = true;
+
+        try
+        {
+            var dbStudent = await Db.Users
+                .FirstOrDefaultAsync(user => user.Id == Id);
+
+            if (dbStudent is null)
+            {
+                saveMessage = $"Студент с ID {Id} больше не существует.";
+                return;
+            }
+
+            dbStudent.Balance = balance.ToString(
+                "0.############################",
+                CultureInfo.InvariantCulture);
+
+            dbStudent.StudentType = draftStudentType;
+            dbStudent.UserType = draftUserType;
+            dbStudent.Ban = draftBan;
+
+            await Db.SaveChangesAsync();
+
+            student = await Db.Users
+                .AsNoTracking()
+                .FirstOrDefaultAsync(user => user.Id == Id);
+
+            if (student is not null)
+                LoadDraftFromStudent();
+
+            saveSucceeded = true;
+            saveMessage = "Изменения успешно сохранены.";
+        }
+        catch (Exception ex)
+        {
+            saveMessage = $"Не удалось сохранить изменения: {ex.Message}";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private void ResetChanges()
+    {
+        LoadDraftFromStudent();
+        saveMessage = null;
+        saveSucceeded = false;
+    }
+
+    private static string FullName(User user)
+    {
+        var name = string.Join(" ", new[] { user.Name, user.Surname }
+            .Where(part => !string.IsNullOrWhiteSpace(part)));
+
+        return string.IsNullOrWhiteSpace(name) ? "—" : name;
+    }
+
+    private static string FormatPhone(double? phone) =>
+        phone.HasValue
+            ? phone.Value.ToString("0", CultureInfo.InvariantCulture)
+            : "—";
+
+    private static string GetInitials(User user)
+    {
+        var first = string.IsNullOrWhiteSpace(user.Name)
+            ? ""
+            : user.Name.Trim();
+
+        var last = string.IsNullOrWhiteSpace(user.Surname)
+            ? ""
+            : user.Surname.Trim();
+
+        var initials = string.Concat(
+            first.Length > 0 ? first[..1] : "",
+            last.Length > 0 ? last[..1] : "");
+
+        return string.IsNullOrWhiteSpace(initials)
+            ? "?"
+            : initials.ToUpperInvariant();
+    }
+}
