@@ -1,30 +1,287 @@
-﻿<div class="top-row ps-3 navbar navbar-dark">
-    <div class="container-fluid">
-        <a class="navbar-brand" href="">admin-blazor</a>
+﻿
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Components
+@using Microsoft.AspNetCore.Components.Authorization
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<div class="admin-nav-root @(IsCollapsed ? "admin-nav-collapsed" : "")">
+
+    <div class="admin-brand">
+        <a href="/" class="admin-brand-link" title="Level English">
+            <img src="/images/level-english-logo.svg"
+                 alt="Level English"
+                 class="admin-brand-logo" />
+        </a>
+
+        <button type="button"
+                class="admin-collapse-button"
+                @onclick="OnToggleCollapse"
+                aria-label="@(IsCollapsed ? "Развернуть меню" : "Свернуть меню")"
+                title="@(IsCollapsed ? "Развернуть меню" : "Свернуть меню")">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+                @if (IsCollapsed)
+                {
+                    <path d="m9 18 6-6-6-6" />
+                }
+                else
+                {
+                    <path d="m15 18-6-6 6-6" />
+                }
+            </svg>
+        </button>
+    </div>
+
+    <div class="admin-profile" title="@displayName">
+        @if (!string.IsNullOrWhiteSpace(avatarPath))
+        {
+            <img src="@avatarPath"
+                 alt="Аватар пользователя"
+                 class="admin-avatar-image" />
+        }
+        else
+        {
+            <div class="admin-avatar" aria-hidden="true">
+                @GetInitials()
+            </div>
+        }
+
+        <div class="admin-profile-info">
+            <div class="admin-profile-name">@displayName</div>
+            <div class="admin-profile-role">Администратор</div>
+        </div>
+    </div>
+
+    <nav class="admin-nav" aria-label="Основная навигация">
+        <div class="admin-nav-group">
+            <div class="admin-nav-caption">ПОЛЬЗОВАТЕЛИ</div>
+
+            <NavLink class="admin-nav-link"
+                     href="/"
+                     Match="NavLinkMatch.All"
+                     title="Пользователи">
+                <svg class="admin-nav-icon" viewBox="0 0 24 24"
+                     fill="none" stroke="currentColor"
+                     stroke-width="1.7" aria-hidden="true">
+                    <circle cx="9" cy="8" r="3.5" />
+                    <path d="M2.5 20v-1.5A5.5 5.5 0 0 1 8 13h2a5.5 5.5 0 0 1 5.5 5.5V20z" />
+                    <path d="M16 4.8a3.5 3.5 0 0 1 0 6.4M18 14a5 5 0 0 1 3.5 4.8V20" />
+                </svg>
+                <span class="admin-nav-text">Пользователи</span>
+            </NavLink>
+
+            <span class="admin-nav-link admin-nav-disabled"
+                  title="Преподаватели">
+                <svg class="admin-nav-icon" viewBox="0 0 24 24"
+                     fill="none" stroke="currentColor"
+                     stroke-width="1.7" aria-hidden="true">
+                    <circle cx="12" cy="8" r="3.5" />
+                    <path d="M5 20v-1a7 7 0 0 1 14 0v1z" />
+                </svg>
+                <span class="admin-nav-text">Преподаватели</span>
+            </span>
+        </div>
+
+        <div class="admin-nav-group">
+            <div class="admin-nav-caption">ПРОГРАММЫ</div>
+
+            <span class="admin-nav-link admin-nav-disabled"
+                  title="Все программы">
+                <svg class="admin-nav-icon" viewBox="0 0 24 24"
+                     fill="none" stroke="currentColor"
+                     stroke-width="1.7" aria-hidden="true">
+                    <rect x="3" y="4" width="18" height="16" rx="2" />
+                    <path d="M3 9h18M8 4v5M16 4v5M8 13h3M8 16h6" />
+                </svg>
+                <span class="admin-nav-text">Все программы</span>
+            </span>
+
+            <span class="admin-nav-link admin-nav-disabled"
+                  title="Расписание">
+                <svg class="admin-nav-icon" viewBox="0 0 24 24"
+                     fill="none" stroke="currentColor"
+                     stroke-width="1.7" aria-hidden="true">
+                    <circle cx="12" cy="12" r="9" />
+                    <path d="M12 7v5l3.5 2" />
+                </svg>
+                <span class="admin-nav-text">Расписание</span>
+            </span>
+
+            <span class="admin-nav-link admin-nav-disabled"
+                  title="Группы">
+                <svg class="admin-nav-icon" viewBox="0 0 24 24"
+                     fill="none" stroke="currentColor"
+                     stroke-width="1.7" aria-hidden="true">
+                    <rect x="3" y="4" width="8" height="7" rx="1.5" />
+                    <rect x="13" y="4" width="8" height="7" rx="1.5" />
+                    <rect x="3" y="13" width="8" height="7" rx="1.5" />
+                    <rect x="13" y="13" width="8" height="7" rx="1.5" />
+                </svg>
+                <span class="admin-nav-text">Группы</span>
+            </span>
+        </div>
+
+        <div class="admin-nav-group">
+            <div class="admin-nav-caption">ПОДПИСКИ</div>
+
+            <span class="admin-nav-link admin-nav-disabled"
+                  title="Создать новую">
+                <svg class="admin-nav-icon" viewBox="0 0 24 24"
+                     fill="none" stroke="currentColor"
+                     stroke-width="1.7" aria-hidden="true">
+                    <rect x="3" y="5" width="18" height="14" rx="2" />
+                    <path d="M3 10h18M8 15h3" />
+                </svg>
+                <span class="admin-nav-text">Создать новую</span>
+            </span>
+        </div>
+
+        <div class="admin-nav-group">
+            <div class="admin-nav-caption">ИГРЫ</div>
+
+            <span class="admin-nav-link admin-nav-disabled"
+                  title="Словарь">
+                <svg class="admin-nav-icon" viewBox="0 0 24 24"
+                     fill="none" stroke="currentColor"
+                     stroke-width="1.7" aria-hidden="true">
+                    <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v16H6.5A2.5 2.5 0 0 0 4 21z" />
+                    <path d="M4 5.5v13A2.5 2.5 0 0 1 6.5 16H20M9 7h7M9 10h5" />
+                </svg>
+                <span class="admin-nav-text">Словарь</span>
+            </span>
+
+            <span class="admin-nav-link admin-nav-disabled"
+                  title="Наборщик">
+                <svg class="admin-nav-icon" viewBox="0 0 24 24"
+                     fill="none" stroke="currentColor"
+                     stroke-width="1.7" aria-hidden="true">
+                    <rect x="2.5" y="5" width="19" height="14" rx="2" />
+                    <path d="M6 9h.01M9 9h.01M12 9h.01M15 9h.01M18 9h.01M6 12h.01M9 12h.01M12 12h.01M15 12h.01M7 15h10" />
+                </svg>
+                <span class="admin-nav-text">Наборщик</span>
+            </span>
+
+            <span class="admin-nav-link admin-nav-disabled"
+                  title="Мастер грамотей">
+                <svg class="admin-nav-icon" viewBox="0 0 24 24"
+                     fill="none" stroke="currentColor"
+                     stroke-width="1.7" aria-hidden="true">
+                    <path d="m12 3 2.6 5.3L20.5 9l-4.3 4.2 1 5.9-5.2-2.8-5.2 2.8 1-5.9L3.5 9l5.9-.7z" />
+                </svg>
+                <span class="admin-nav-text">Мастер грамотей</span>
+            </span>
+
+            <span class="admin-nav-link admin-nav-disabled"
+                  title="Тесты">
+                <svg class="admin-nav-icon" viewBox="0 0 24 24"
+                     fill="none" stroke="currentColor"
+                     stroke-width="1.7" aria-hidden="true">
+                    <path d="M7 3h10v3H7zM6 6H4v15h16V6h-2" />
+                    <path d="m8 13 2.5 2.5L16 10" />
+                </svg>
+                <span class="admin-nav-text">Тесты</span>
+            </span>
+        </div>
+
+        <div class="admin-nav-group">
+            <div class="admin-nav-caption">ПЛАТФОРМА</div>
+
+            <span class="admin-nav-link admin-nav-disabled"
+                  title="Главный сайт">
+                <svg class="admin-nav-icon" viewBox="0 0 24 24"
+                     fill="none" stroke="currentColor"
+                     stroke-width="1.7" aria-hidden="true">
+                    <circle cx="12" cy="12" r="9" />
+                    <path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18" />
+                </svg>
+                <span class="admin-nav-text">Главный сайт</span>
+            </span>
+
+            <span class="admin-nav-link admin-nav-disabled"
+                  title="Level-Гид">
+                <svg class="admin-nav-icon" viewBox="0 0 24 24"
+                     fill="none" stroke="currentColor"
+                     stroke-width="1.7" aria-hidden="true">
+                    <path d="M12 3 3 8l9 5 9-5zM3 12l9 5 9-5M3 16l9 5 9-5" />
+                </svg>
+                <span class="admin-nav-text">Level-Гид</span>
+            </span>
+
+            <span class="admin-nav-link admin-nav-disabled"
+                  title="Правила платформы">
+                <svg class="admin-nav-icon" viewBox="0 0 24 24"
+                     fill="none" stroke="currentColor"
+                     stroke-width="1.7" aria-hidden="true">
+                    <path d="M5 3h14v18H5zM8 7h8M8 11h8M8 15h5" />
+                </svg>
+                <span class="admin-nav-text">Правила платформы</span>
+            </span>
+
+            <span class="admin-nav-link admin-nav-disabled"
+                  title="Политика платформы">
+                <svg class="admin-nav-icon" viewBox="0 0 24 24"
+                     fill="none" stroke="currentColor"
+                     stroke-width="1.7" aria-hidden="true">
+                    <path d="M12 22s8-4 8-11V5l-8-3-8 3v6c0 7 8 11 8 11z" />
+                    <path d="m9 12 2 2 4-4" />
+                </svg>
+                <span class="admin-nav-text">Политика платформы</span>
+            </span>
+        </div>
+    </nav>
+
+    <div class="admin-sidebar-footer">
+        <svg class="admin-nav-icon" viewBox="0 0 24 24"
+             fill="none" stroke="currentColor"
+             stroke-width="1.7" aria-hidden="true">
+            <path d="M3 10 12 3l9 7v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z" />
+            <path d="M9 21v-7h6v7" />
+        </svg>
+        <span class="admin-footer-text">Панель управления школой</span>
     </div>
 </div>
 
-<input type="checkbox" title="Navigation menu" class="navbar-toggler" />
+@code {
+    [Parameter]
+    public bool IsCollapsed { get; set; }
 
-<div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
-    <nav class="nav flex-column">
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Home
-            </NavLink>
-        </div>
+    [Parameter]
+    public EventCallback OnToggleCollapse { get; set; }
 
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="counter">
-                <span class="bi bi-plus-square-fill-nav-menu" aria-hidden="true"></span> Counter
-            </NavLink>
-        </div>
+    private string displayName = "Администратор";
+    private string? avatarPath;
 
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="weather">
-                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Weather
-            </NavLink>
-        </div>
-    </nav>
-</div>
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider
+            .GetAuthenticationStateAsync();
 
+        var user = authState.User;
+        var name = user.FindFirst("DisplayName")?.Value;
+
+        if (!string.IsNullOrWhiteSpace(name))
+            displayName = name;
+
+        var avatar = user.FindFirst("Avatar")?.Value;
+
+        if (!string.IsNullOrWhiteSpace(avatar))
+        {
+            var fileName = Path.GetFileName(avatar.Replace('\\', '/'));
+            avatarPath = $"/images/user/{Uri.EscapeDataString(fileName)}";
+        }
+    }
+
+    private string GetInitials()
+    {
+        var parts = displayName.Split(
+            ' ',
+            StringSplitOptions.RemoveEmptyEntries);
+
+        if (parts.Length == 0)
+            return "A";
+
+        if (parts.Length == 1)
+            return parts[0][..1].ToUpperInvariant();
+
+        return $"{parts[0][..1]}{parts[1][..1]}".ToUpperInvariant();
+    }
+}

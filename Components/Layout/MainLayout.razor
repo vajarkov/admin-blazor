@@ -1,30 +1,67 @@
 ﻿@inherits LayoutComponentBase
 
-<div class="page">
-    <div class="sidebar">
-        <NavMenu />
-    </div>
+<div class="admin-shell @(isSidebarCollapsed ? "sidebar-collapsed" : "") @(isMobileMenuOpen ? "mobile-menu-open" : "")">
+    <aside class="admin-sidebar">
+        <NavMenu IsCollapsed="@isSidebarCollapsed" OnToggleCollapse="@ToggleSidebar" />
+    </aside>
 
-    <main>
-        <div class="top-row px-4 d-flex justify-content-between align-items-center">
-            <span>Панель администратора</span>
+    @if (isMobileMenuOpen)
+    {
+        <button type="button" class="admin-sidebar-backdrop" aria-label="Закрыть меню" @onclick="CloseMobileMenu">
+        </button>
+    }
+
+    <div class="admin-main">
+        <header class="admin-topbar">
+            <div class="admin-topbar-left">
+                <button type="button" class="admin-mobile-menu-button" aria-label="Открыть меню"
+                        aria-expanded="@isMobileMenuOpen" @onclick="ToggleMobileMenu">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M4 6h16M4 12h16M4 18h16" />
+                    </svg>
+                </button>
+
+                <div class="admin-topbar-title">
+                    <span class="admin-topbar-eyebrow">LEVEL ENGLISH</span>
+                    <span class="admin-topbar-heading">Панель управления</span>
+                </div>
+            </div>
 
             <form method="post" action="/auth/logout">
                 <AntiforgeryToken />
-                <button type="submit" class="btn btn-outline-secondary btn-sm">
-                    Выйти
+                <button type="submit" class="admin-logout">
+                    <span>Выйти</span>
                 </button>
             </form>
-        </div>
+        </header>
 
-        <article class="content px-4">
+        <main class="admin-content">
             @Body
-        </article>
-    </main>
+        </main>
+    </div>
 </div>
 
 <div id="blazor-error-ui" data-nosnippet>
-    An unhandled error has occurred.
-    <a href="." class="reload">Reload</a>
-    <span class="dismiss">🗙</span>
+    Произошла ошибка.
+    <a href="." class="reload">Перезагрузить</a>
+    <span class="dismiss">×</span>
 </div>
+
+@code {
+    private bool isSidebarCollapsed;
+    private bool isMobileMenuOpen;
+
+    private void ToggleSidebar()
+    {
+        isSidebarCollapsed = !isSidebarCollapsed;
+    }
+    private void ToggleMobileMenu()
+    {
+        isMobileMenuOpen = !isMobileMenuOpen;
+    }
+
+    private void CloseMobileMenu()
+    {
+        isMobileMenuOpen = false;
+    }
+}

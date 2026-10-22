@@ -27,3 +27,6 @@ secrets.json
 .DS_Store
 Thumbs.db
 
+# Пользовательские фотографии
+/wwwroot/images/user/*
+!/wwwroot/images/user/avatar-1.jpg

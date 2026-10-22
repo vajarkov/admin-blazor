@@ -1,53 +1,59 @@
 @page "/login"
+@layout LoginLayout
+@using admin_blazor.Components.Layout
 @using Microsoft.AspNetCore.Antiforgery
-@using Microsoft.AspNetCore.Authentication
-@using Microsoft.AspNetCore.Authentication.Cookies
 @inject IAntiforgery Antiforgery
 @inject IHttpContextAccessor HttpContextAccessor
 @inject NavigationManager NavigationManager
 
-<PageTitle>Вход в систему</PageTitle>
+<PageTitle>Вход — Level English</PageTitle>
 
-<div class="login-container">
-    <h1>Вход в систему</h1>
+<div class="login-page">
+    <div class="login-card">
+        <div class="login-heading">
+            <div class="login-brand">LEVEL ENGLISH</div>
+            <h1>Вход в систему</h1>
+            <p>Панель управления школой</p>
+        </div>
 
-    @if (HttpContextAccessor.HttpContext is { } context)
-    {
-        var tokens = Antiforgery.GetAndStoreTokens(context);
+        @if (HttpContextAccessor.HttpContext is { } context)
+        {
+            var tokens = Antiforgery.GetAndStoreTokens(context);
 
-        <form method="post" action="/auth/login">
-            <input type="hidden"
-                   name="__RequestVerificationToken"
-                   value="@tokens.RequestToken" />
+            <form method="post" action="/auth/login">
+                <input type="hidden"
+                       name="__RequestVerificationToken"
+                       value="@tokens.RequestToken" />
 
-            <div class="mb-3">
-                <label for="phone" class="form-label">Номер телефона</label>
-                <input id="phone"
-                       name="Phone"
-                       class="form-control"
-                       type="tel"
-                       inputmode="tel"
-                       autocomplete="username"
-                       placeholder="+7 (___) ___-__-__"
-                       required />
-            </div>
+                <div class="login-field">
+                    <label for="phone">Номер телефона</label>
+                    <input id="phone"
+                           name="Phone"
+                           class="form-control"
+                           type="tel"
+                           inputmode="tel"
+                           autocomplete="username"
+                           placeholder="+7 (___) ___-__-__"
+                           required />
+                </div>
 
-            <div class="mb-3">
-                <label for="password" class="form-label">Пароль</label>
-                <input id="password"
-                       name="Password"
-                       type="password"
-                       class="form-control"
-                       autocomplete="current-password"
-                       placeholder="Введите пароль"
-                       required />
-            </div>
+                <div class="login-field">
+                    <label for="password">Пароль</label>
+                    <input id="password"
+                           name="Password"
+                           class="form-control"
+                           type="password"
+                           autocomplete="current-password"
+                           placeholder="Введите пароль"
+                           required />
+                </div>
 
-            <button type="submit" class="btn btn-primary w-100">
-                Войти
-            </button>
-        </form>
-    }
+                <button type="submit" class="btn login-submit">
+                    Войти
+                </button>
+            </form>
+        }
+    </div>
 </div>
 
 @code {

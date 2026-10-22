@@ -1,4 +1,3 @@
-
 namespace admin_blazor.Models;
 
 public class User

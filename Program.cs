@@ -104,17 +104,14 @@ app.MapPost("/auth/login", async (
 
     var claims = new[]
     {
+        new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+        new Claim(ClaimTypes.Name, user.Phone?.ToString("0") ?? ""),
         new Claim(
-            ClaimTypes.NameIdentifier,
-            user.Id.ToString()),
-
-        new Claim(
-            ClaimTypes.Name,
-            user.Phone?.ToString("0") ?? ""),
-
-        new Claim(
-            ClaimTypes.Role,
-            "Admin")
+            "DisplayName",
+            string.Join(" ", new[] { user.Name, user.Surname }
+                .Where(s => !string.IsNullOrWhiteSpace(s)))),
+        new Claim("Avatar", user.Avatar ?? ""),
+        new Claim(ClaimTypes.Role, "Admin")
     };
 
     var identity = new ClaimsIdentity(

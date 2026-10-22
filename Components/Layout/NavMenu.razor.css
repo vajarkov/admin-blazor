@@ -1,105 +1,271 @@
-.navbar-toggler {
-    appearance: none;
-    cursor: pointer;
-    width: 3.5rem;
-    height: 2.5rem;
-    color: white;
-    position: absolute;
-    top: 0.5rem;
-    right: 1rem;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    background: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba%28255, 255, 255, 0.55%29' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e") no-repeat center/1.75rem rgba(255, 255, 255, 0.1);
+
+.admin-nav-root {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
 }
 
-.navbar-toggler:checked {
-    background-color: rgba(255, 255, 255, 0.5);
-}
-
-.top-row {
-    min-height: 3.5rem;
-    background-color: rgba(0,0,0,0.4);
-}
-
-.navbar-brand {
-    font-size: 1.1rem;
-}
-
-.bi {
-    display: inline-block;
+.admin-brand {
     position: relative;
-    width: 1.25rem;
-    height: 1.25rem;
-    margin-right: 0.75rem;
-    top: -1px;
-    background-size: cover;
+    flex: 0 0 76px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 0 24px;
+    border-bottom: 1px solid #edf0f5;
 }
 
-.bi-house-door-fill-nav-menu {
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='white' class='bi bi-house-door-fill' viewBox='0 0 16 16'%3E%3Cpath d='M6.5 14.5v-3.505c0-.245.25-.495.5-.495h2c.25 0 .5.25.5.5v3.5a.5.5 0 0 0 .5.5h4a.5.5 0 0 0 .5-.5v-7a.5.5 0 0 0-.146-.354L13 5.793V2.5a.5.5 0 0 0-.5-.5h-1a.5.5 0 0 0-.5.5v1.293L8.354 1.146a.5.5 0 0 0-.708 0l-6 6A.5.5 0 0 0 1.5 7.5v7a.5.5 0 0 0 .5.5h4a.5.5 0 0 0 .5-.5Z'/%3E%3C/svg%3E");
+.admin-brand-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 66px;
+    height: 48px;
+    flex: 0 0 66px;
 }
 
-.bi-plus-square-fill-nav-menu {
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='white' class='bi bi-plus-square-fill' viewBox='0 0 16 16'%3E%3Cpath d='M2 0a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2H2zm6.5 4.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3a.5.5 0 0 1 1 0z'/%3E%3C/svg%3E");
-}
-
-.bi-list-nested-nav-menu {
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='white' class='bi bi-list-nested' viewBox='0 0 16 16'%3E%3Cpath fill-rule='evenodd' d='M4.5 11.5A.5.5 0 0 1 5 11h10a.5.5 0 0 1 0 1H5a.5.5 0 0 1-.5-.5zm-2-4A.5.5 0 0 1 3 7h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm-2-4A.5.5 0 0 1 1 3h10a.5.5 0 0 1 0 1H1a.5.5 0 0 1-.5-.5z'/%3E%3C/svg%3E");
-}
-
-.nav-item {
-    font-size: 0.9rem;
-    padding-bottom: 0.5rem;
-}
-
-    .nav-item:first-of-type {
-        padding-top: 1rem;
-    }
-
-    .nav-item:last-of-type {
-        padding-bottom: 1rem;
-    }
-
-    .nav-item ::deep .nav-link {
-        color: #d7d7d7;
-        background: none;
-        border: none;
-        border-radius: 4px;
-        height: 3rem;
-        display: flex;
-        align-items: center;
-        line-height: 3rem;
-        width: 100%;
-    }
-
-.nav-item ::deep a.active {
-    background-color: rgba(255,255,255,0.37);
-    color: white;
-}
-
-.nav-item ::deep .nav-link:hover {
-    background-color: rgba(255,255,255,0.1);
-    color: white;
-}
-
-.nav-scrollable {
-    display: none;
-}
-
-.navbar-toggler:checked ~ .nav-scrollable {
+.admin-brand-logo {
     display: block;
+    width: 66px;
+    height: 48px;
+    max-width: 66px;
+    object-fit: contain;
 }
 
-@media (min-width: 641px) {
-    .navbar-toggler {
-        display: none;
-    }
+.admin-collapse-button {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    transform: translateY(-50%);
+    border: 1px solid #e6eaf0;
+    border-radius: 7px;
+    background: #fff;
+    color: #68758a;
+    cursor: pointer;
+}
 
-    .nav-scrollable {
-        /* Never collapse the sidebar for wide screens */
-        display: block;
+.admin-collapse-button:hover {
+    background: #edf2ff;
+    border-color: #d6e1ff;
+    color: #2459c4;
+}
 
-        /* Allow sidebar to scroll for tall menus */
-        height: calc(100vh - 3.5rem);
-        overflow-y: auto;
-    }
+.admin-collapse-button svg {
+    width: 17px;
+    height: 17px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.admin-profile {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+    margin: 16px 16px 22px;
+    padding: 12px;
+    border: 1px solid #edf0f5;
+    border-radius: 9px;
+}
+
+.admin-avatar,
+.admin-avatar-image {
+    width: 38px;
+    height: 38px;
+    flex: 0 0 38px;
+    border-radius: 50%;
+}
+
+.admin-avatar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #eaf0ff;
+    color: #2459c4;
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.admin-avatar-image {
+    display: block;
+    object-fit: cover;
+}
+
+.admin-profile-info {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.admin-profile-name {
+    overflow: hidden;
+    color: #273349;
+    font-size: 13px;
+    font-weight: 650;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.admin-profile-role {
+    margin-top: 3px;
+    color: #8590a3;
+    font-size: 12px;
+}
+
+.admin-nav {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    padding: 0 14px 16px;
+}
+
+.admin-nav-group {
+    margin-bottom: 22px;
+}
+
+.admin-nav-caption {
+    margin: 0 10px 10px;
+    color: #929caf;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    white-space: nowrap;
+}
+
+.admin-nav-link {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 43px;
+    margin-bottom: 4px;
+    padding: 0 12px;
+    border-radius: 7px;
+    color: #5c667a;
+    font-size: 14px;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.admin-nav-link:hover {
+    background: #f4f6fb;
+    color: #2459c4;
+}
+
+.admin-nav-link.active {
+    background: #edf2ff;
+    color: #2459c4;
+    font-weight: 600;
+}
+
+.admin-nav-icon {
+    display: block;
+    width: 20px;
+    height: 20px;
+    flex: 0 0 20px;
+}
+
+.admin-nav-text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.admin-nav-disabled {
+    color: #929caf;
+    cursor: default;
+    user-select: none;
+}
+
+.admin-sidebar-footer {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 58px;
+    padding: 18px 24px;
+    border-top: 1px solid #edf0f5;
+    color: #98a2b3;
+    font-size: 11px;
+    white-space: nowrap;
+}
+
+
+/* Свёрнутое состояние */
+
+.admin-nav-root.admin-nav-collapsed .admin-brand {
+    justify-content: center;
+    padding: 0;
+}
+
+.admin-nav-root.admin-nav-collapsed .admin-brand-link {
+    width: 48px;
+    flex-basis: 48px;
+}
+
+.admin-nav-root.admin-nav-collapsed .admin-brand-logo {
+    width: 46px;
+    height: 42px;
+}
+
+.admin-nav-root.admin-nav-collapsed .admin-collapse-button {
+    right: 4px;
+    top: auto;
+    bottom: 2px;
+    width: 22px;
+    height: 22px;
+    transform: none;
+    background: #fff;
+}
+
+.admin-nav-root.admin-nav-collapsed .admin-profile {
+    flex-direction: column;
+    justify-content: center;
+    gap: 0;
+    margin: 14px 8px 18px;
+    padding: 9px 4px;
+}
+
+.admin-nav-root.admin-nav-collapsed .admin-profile-info,
+.admin-nav-root.admin-nav-collapsed .admin-nav-caption,
+.admin-nav-root.admin-nav-collapsed .admin-nav-text,
+.admin-nav-root.admin-nav-collapsed .admin-footer-text {
+    display: none !important;
+}
+
+.admin-nav-root.admin-nav-collapsed .admin-nav {
+    padding: 0 8px 12px;
+}
+
+.admin-nav-root.admin-nav-collapsed .admin-nav-group {
+    margin-bottom: 14px;
+}
+
+.admin-nav-root.admin-nav-collapsed .admin-nav-link {
+    justify-content: center;
+    gap: 0;
+    padding: 0;
+}
+
+.admin-nav-root.admin-nav-collapsed .admin-nav-icon {
+    width: 21px;
+    height: 21px;
+    flex-basis: 21px;
+}
+
+.admin-nav-root.admin-nav-collapsed .admin-sidebar-footer {
+    justify-content: center;
+    padding: 16px 0;
 }
