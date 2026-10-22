@@ -1,59 +1,424 @@
 ﻿@page "/"
 @attribute [Microsoft.AspNetCore.Authorization.Authorize]
 @using admin_blazor.Data
+@using admin_blazor.Models
 @using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.JSInterop
+@using System.Globalization
 @inject AppDbContext Db
+@inject IJSRuntime JS
 
-<PageTitle>Проверка базы данных</PageTitle>
+<PageTitle>Главная</PageTitle>
 
-<h1>Пользователи</h1>
+<h3 class="mb-4">Главная</h3>
 
-@if (users is null)
+@if (isLoading)
 {
     <p>Загрузка...</p>
 }
 else
 {
-    <p>Всего записей: @users.Count</p>
+    <div class="row g-4 align-items-stretch">
+        <div class="col-12 col-md-6">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="mb-0">Цена LVL</h5>
+                </div>
 
-    <table class="table">
-        <thead>
-            <tr>
-                <th>ID</th>
-                <th>Имя</th>
-                <th>Фамилия</th>
-                <th>Номер телефона</th>
-                <th>Тип пользователя</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var user in users)
-            {
-                <tr>
-                    <td>@user.Id</td>
-                    <td>@user.Name</td>
-                    <td>@user.Surname</td>
-                    <td>@user.Phone</td>
-                    <td>@user.UserType</td>
-                </tr>
-            }
-        </tbody>
-    </table>
+                <div class="card-body d-flex flex-column">
+                    <EditForm Model="@priceForm"
+                              OnValidSubmit="@SavePriceAsync"
+                              class="d-flex flex-column flex-grow-1">
+                        <div class="mb-3">
+                            <label for="priceKzt" class="form-label">
+                                Цена в KZT
+                            </label>
+
+                            <InputNumber TValue="int"
+                                         id="priceKzt"
+                                         class="form-control"
+                                         min="0"
+                                         @bind-Value="priceForm.PriceKzt" />
+                        </div>
+
+                        <button type="submit"
+                                class="btn btn-primary w-100 mt-auto">
+                            Сохранить
+                        </button>
+                    </EditForm>
+
+                    @if (!string.IsNullOrWhiteSpace(statusMessage))
+                    {
+                        <div class="alert @statusClass mt-3 mb-0" role="alert">
+                            @statusMessage
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-md-6">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="mb-0">Пополнить баланс</h5>
+                </div>
+
+                <div class="card-body d-flex flex-column">
+                    <EditForm Model="@balanceForm"
+                              OnValidSubmit="@SearchUserAsync"
+                              class="d-flex flex-column">
+                        <div class="mb-3">
+                            <label for="userId" class="form-label">
+                                ID пользователя
+                            </label>
+
+                            <InputNumber TValue="int"
+                                         id="userId"
+                                         class="form-control"
+                                         min="1"
+                                         @bind-Value="balanceForm.UserId" />
+                        </div>
+
+                        <button type="submit" class="btn btn-primary w-100">
+                            Найти пользователя
+                        </button>
+                    </EditForm>
+
+                    @if (!string.IsNullOrWhiteSpace(balanceMessage))
+                    {
+                        <div class="alert @balanceMessageClass mt-3 mb-0"
+                             role="alert">
+                            @balanceMessage
+                        </div>
+                    }
+
+                    @if (selectedUser is not null)
+                    {
+                        <hr class="my-4" />
+
+                        <h6>
+                            @selectedUser.Name @selectedUser.Surname
+                        </h6>
+
+                        <p class="mb-3">
+                            Текущий баланс:
+                            <strong>@(selectedUser.Balance ?? "0") LVL</strong>
+                        </p>
+
+                        <EditForm Model="@topUpForm"
+                                  OnValidSubmit="@TopUpBalanceAsync">
+                            <div class="mb-3">
+                                <label for="amountLvl" class="form-label">
+                                    Сумма пополнения (LVL)
+                                </label>
+
+                                <InputNumber TValue="decimal"
+                                             id="amountLvl"
+                                             class="form-control"
+                                             min="0.01"
+                                             step="0.01"
+                                             @bind-Value="topUpForm.AmountLvl" />
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="cancellationDate" class="form-label">
+                                    Дата аннулирования
+                                </label>
+
+                                <InputDate TValue="DateTime?"
+                                           id="cancellationDate"
+                                           class="form-control"
+                                           @bind-Value="topUpForm.CancellationDate" />
+                            </div>
+
+                            <button type="submit"
+                                    class="btn btn-primary w-100"
+                                    disabled="@isSavingTopUp">
+                                @(isSavingTopUp ? "Сохранение..." : "Пополнить баланс")
+                            </button>
+                        </EditForm>
+
+                        @if (!string.IsNullOrWhiteSpace(topUpMessage))
+                        {
+                            <div class="alert @topUpMessageClass mt-3 mb-0"
+                                 role="alert">
+                                @topUpMessage
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
 }
 
 @code {
-    private List<UserRow>? users;
+    private bool isLoading = true;
+    private bool isSavingTopUp;
+
+    private PriceForm priceForm = new();
+    private BalanceForm balanceForm = new();
+    private TopUpForm topUpForm = new();
+
+    private User? selectedUser;
+
+    private string? statusMessage;
+    private string statusClass = "alert-success";
+
+    private string? balanceMessage;
+    private string balanceMessageClass = "alert-info";
+
+    private string? topUpMessage;
+    private string topUpMessageClass = "alert-success";
 
     protected override async Task OnInitializedAsync()
     {
-        users = await Db.Users
-            .AsNoTracking()
-            .OrderBy(u => u.Id)
-            .Select(u => new UserRow(
-                u.Id, u.Name, u.Surname, u.Phone, u.UserType))
-            .ToListAsync();
+        try
+        {
+            var config = await Db.Configs
+                .AsNoTracking()
+                .SingleOrDefaultAsync(c => c.Id == 1);
+
+            priceForm.PriceKzt = config?.PriceKzt is uint price
+                ? checked((int)price)
+                : 0;
+        }
+        catch
+        {
+            statusClass = "alert-danger";
+            statusMessage = "Не удалось загрузить текущую цену LVL.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
     }
 
-    private record UserRow(
-        uint Id, string? Name, string? Surname, double? Phone, uint? UserType);
+    private async Task SavePriceAsync()
+    {
+        statusMessage = null;
+
+        if (priceForm.PriceKzt < 0)
+        {
+            statusClass = "alert-danger";
+            statusMessage = "Цена не может быть отрицательной.";
+            return;
+        }
+
+        var confirmed = await JS.InvokeAsync<bool>(
+            "confirm",
+            "Вы уверены, что хотите сохранить новую цену LVL?");
+
+        if (!confirmed)
+        {
+            return;
+        }
+
+        try
+        {
+            var config = await Db.Configs
+                .SingleOrDefaultAsync(c => c.Id == 1);
+
+            if (config is null)
+            {
+                config = new Config
+                {
+                    Id = 1,
+                    PriceKzt = (uint)priceForm.PriceKzt
+                };
+
+                Db.Configs.Add(config);
+            }
+            else
+            {
+                config.PriceKzt = (uint)priceForm.PriceKzt;
+            }
+
+            await Db.SaveChangesAsync();
+
+            statusClass = "alert-success";
+            statusMessage = "Цена LVL успешно сохранена.";
+        }
+        catch
+        {
+            statusClass = "alert-danger";
+            statusMessage = "Не удалось сохранить цену LVL.";
+        }
+    }
+
+    private async Task SearchUserAsync()
+    {
+        selectedUser = null;
+        balanceMessage = null;
+        topUpMessage = null;
+        topUpForm = new TopUpForm();
+
+        if (balanceForm.UserId <= 0)
+        {
+            balanceMessageClass = "alert-danger";
+            balanceMessage = "Введите корректный ID пользователя.";
+            return;
+        }
+
+        try
+        {
+            selectedUser = await Db.Users
+                .AsNoTracking()
+                .SingleOrDefaultAsync(u => u.Id == (uint)balanceForm.UserId);
+
+            if (selectedUser is null)
+            {
+                balanceMessageClass = "alert-warning";
+                balanceMessage = $"Пользователь с ID {balanceForm.UserId} не найден.";
+                return;
+            }
+
+            balanceMessageClass = "alert-success";
+            balanceMessage = "Пользователь найден.";
+        }
+        catch
+        {
+            balanceMessageClass = "alert-danger";
+            balanceMessage = "Не удалось найти пользователя. Проверьте подключение к базе данных.";
+        }
+    }
+
+    private async Task TopUpBalanceAsync()
+    {
+        topUpMessage = null;
+
+        if (selectedUser is null)
+        {
+            topUpMessageClass = "alert-danger";
+            topUpMessage = "Сначала найдите пользователя.";
+            return;
+        }
+
+        if (topUpForm.AmountLvl <= 0)
+        {
+            topUpMessageClass = "alert-danger";
+            topUpMessage = "Сумма пополнения должна быть больше нуля.";
+            return;
+        }
+
+        if (topUpForm.CancellationDate is null)
+        {
+            topUpMessageClass = "alert-danger";
+            topUpMessage = "Укажите дату аннулирования.";
+            return;
+        }
+
+        var cancellationLocal = DateTime.SpecifyKind(
+            topUpForm.CancellationDate.Value.Date,
+            DateTimeKind.Local);
+
+        var cancellationTimestamp =
+            new DateTimeOffset(cancellationLocal).ToUnixTimeSeconds();
+
+        if (cancellationTimestamp < 0 ||
+            cancellationTimestamp > uint.MaxValue)
+        {
+            topUpMessageClass = "alert-danger";
+            topUpMessage = "Указанная дата аннулирования вне допустимого диапазона.";
+            return;
+        }
+
+        isSavingTopUp = true;
+
+        try
+        {
+            await using var transaction =
+                await Db.Database.BeginTransactionAsync();
+
+            var user = await Db.Users
+                .SingleOrDefaultAsync(u => u.Id == selectedUser.Id);
+
+            if (user is null)
+            {
+                await transaction.RollbackAsync();
+
+                selectedUser = null;
+                balanceMessageClass = "alert-warning";
+                balanceMessage = "Пользователь больше не найден. Выполните поиск повторно.";
+                return;
+            }
+
+            decimal currentBalance = 0;
+
+            if (!string.IsNullOrWhiteSpace(user.Balance) &&
+                !decimal.TryParse(
+                    user.Balance,
+                    NumberStyles.Number,
+                    CultureInfo.InvariantCulture,
+                    out currentBalance) &&
+                !decimal.TryParse(
+                    user.Balance,
+                    NumberStyles.Number,
+                    CultureInfo.CurrentCulture,
+                    out currentBalance))
+            {
+                await transaction.RollbackAsync();
+
+                topUpMessageClass = "alert-danger";
+                topUpMessage = "Текущий баланс пользователя имеет неверный формат. Пополнение не выполнено.";
+                return;
+            }
+
+            var newBalance = currentBalance + topUpForm.AmountLvl;
+
+            user.Balance = newBalance.ToString(CultureInfo.InvariantCulture);
+
+            var log = new Logspay
+            {
+                Time = checked((uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds()),
+                UserId = user.Id,
+                Cancellation = (uint)cancellationTimestamp,
+                Lvl = (double)topUpForm.AmountLvl,
+                Kzt = null
+            };
+
+            Db.Logspays.Add(log);
+
+            await Db.SaveChangesAsync();
+            await transaction.CommitAsync();
+
+            selectedUser = new User
+            {
+                Id = user.Id,
+                Name = user.Name,
+                Surname = user.Surname,
+                Balance = user.Balance
+            };
+
+            topUpMessageClass = "alert-success";
+            topUpMessage = $"Баланс успешно пополнен на {topUpForm.AmountLvl.ToString(CultureInfo.InvariantCulture)} LVL.";
+            topUpForm = new TopUpForm();
+        }
+        catch
+        {
+            topUpMessageClass = "alert-danger";
+            topUpMessage = "Не удалось пополнить баланс. Изменения не были подтверждены.";
+        }
+        finally
+        {
+            isSavingTopUp = false;
+        }
+    }
+
+    private sealed class PriceForm
+    {
+        public int PriceKzt { get; set; }
+    }
+
+    private sealed class BalanceForm
+    {
+        public int UserId { get; set; }
+    }
+
+    private sealed class TopUpForm
+    {
+        public decimal AmountLvl { get; set; }
+        public DateTime? CancellationDate { get; set; }
+    }
 }

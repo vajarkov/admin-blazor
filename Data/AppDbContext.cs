@@ -8,6 +8,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
     : DbContext(options)
 {
     public DbSet<User> Users => Set<User>();
+    public DbSet<Config> Configs => Set<Config>();
+    public DbSet<Logspay> Logspays => Set<Logspay>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -31,6 +33,28 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
             entity.Property(u => u.Verify).HasColumnName("verify");
             entity.Property(u => u.Sex).HasColumnName("sex");
             entity.Property(u => u.DateOfBirth).HasColumnName("dataofbirth");
+        });
+
+        modelBuilder.Entity<Config>(entity =>
+        {
+            entity.ToTable("config");
+            entity.HasKey(c => c.Id);
+
+            entity.Property(c => c.Id).HasColumnName("id");
+            entity.Property(c => c.PriceKzt).HasColumnName("pricekzt");
+        });
+
+        modelBuilder.Entity<Logspay>(entity =>
+        {
+            entity.ToTable("logspay");
+            entity.HasKey(l => l.Id);
+
+            entity.Property(l => l.Id).HasColumnName("id");
+            entity.Property(l => l.Time).HasColumnName("time");
+            entity.Property(l => l.UserId).HasColumnName("user");
+            entity.Property(l => l.Cancellation).HasColumnName("cancellation");
+            entity.Property(l => l.Lvl).HasColumnName("lvl");
+            entity.Property(l => l.Kzt).HasColumnName("kzt");
         });
     }
 }
