@@ -1,4 +1,5 @@
-﻿@page "/"
+﻿
+@page "/"
 @attribute [Microsoft.AspNetCore.Authorization.Authorize]
 @using admin_blazor.Data
 @using admin_blazor.Models
@@ -68,16 +69,39 @@ else
                     <EditForm Model="@balanceForm"
                               OnValidSubmit="@SearchUserAsync"
                               class="d-flex flex-column">
-                        <div class="mb-3">
-                            <label for="userId" class="form-label">
-                                ID пользователя
+                        <div class="mb-3 position-relative">
+                            <label for="userSearch" class="form-label">
+                                Поиск пользователя по ФИО или ID
                             </label>
 
-                            <InputNumber TValue="int"
-                                         id="userId"
-                                         class="form-control"
-                                         min="1"
-                                         @bind-Value="balanceForm.UserId" />
+                            <input id="userSearch"
+                                   type="text"
+                                   class="form-control"
+                                   placeholder="Введите имя, фамилию или ID"
+                                   autocomplete="off"
+                                   value="@userSearchText"
+                                   @oninput="OnUserSearchInputAsync" />
+
+                            @if (userSuggestions.Count > 0)
+                            {
+                                <div class="list-group position-absolute w-100 shadow"
+                                     style="z-index: 1050; max-height: 240px; overflow-y: auto;">
+                                    @foreach (var user in userSuggestions)
+                                    {
+                                        <button @key="user.Id"
+                                                type="button"
+                                                class="list-group-item list-group-item-action"
+                                                @onclick="() => SelectUserAsync(user)">
+                                            <span class="d-block">
+                                                @user.Name @user.Surname
+                                            </span>
+                                            <small class="text-muted">
+                                                ID: @user.Id
+                                            </small>
+                                        </button>
+                                    }
+                                </div>
+                            }
                         </div>
 
                         <button type="submit" class="btn btn-primary w-100">
@@ -102,6 +126,8 @@ else
                         </h6>
 
                         <p class="mb-3">
+                            ID: @selectedUser.Id
+                            <br />
                             Текущий баланс:
                             <strong>@(selectedUser.Balance ?? "0") LVL</strong>
                         </p>
@@ -162,6 +188,8 @@ else
     private TopUpForm topUpForm = new();
 
     private User? selectedUser;
+    private List<User> userSuggestions = new();
+    private string userSearchText = string.Empty;
 
     private string? statusMessage;
     private string statusClass = "alert-success";
@@ -247,40 +275,216 @@ else
         }
     }
 
+    private async Task OnUserSearchInputAsync(ChangeEventArgs args)
+    {
+        userSearchText = args.Value?.ToString() ?? string.Empty;
+
+        userSuggestions.Clear();
+        selectedUser = null;
+        balanceMessage = null;
+        topUpMessage = null;
+
+        var search = userSearchText.Trim();
+
+        if (search.Length < 2)
+        {
+            return;
+        }
+
+        try
+        {
+            if (uint.TryParse(search, out var id))
+            {
+                if (id == 0)
+                {
+                    return;
+                }
+
+                var user = await Db.Users
+                    .AsNoTracking()
+                    .Where(u => u.Id == id)
+                    .Select(u => new User
+                    {
+                        Id = u.Id,
+                        Name = u.Name,
+                        Surname = u.Surname,
+                        Balance = u.Balance
+                    })
+                    .SingleOrDefaultAsync();
+
+                if (user is not null)
+                {
+                    userSuggestions.Add(user);
+                }
+
+                return;
+            }
+
+            userSuggestions = await BuildNameSearchQuery(search)
+                .OrderBy(u => u.Name)
+                .ThenBy(u => u.Surname)
+                .Take(10)
+                .Select(u => new User
+                {
+                    Id = u.Id,
+                    Name = u.Name,
+                    Surname = u.Surname,
+                    Balance = u.Balance
+                })
+                .ToListAsync();
+        }
+        catch
+        {
+            userSuggestions.Clear();
+            balanceMessageClass = "alert-danger";
+            balanceMessage = "Не удалось выполнить поиск. Проверьте подключение к базе данных.";
+        }
+    }
+
+    private IQueryable<User> BuildNameSearchQuery(string search)
+    {
+        var terms = search.Split(
+            ' ',
+            StringSplitOptions.RemoveEmptyEntries);
+
+        var query = Db.Users.AsNoTracking();
+
+        if (terms.Length >= 2)
+        {
+            var first = terms[0];
+            var second = terms[1];
+
+            query = query.Where(u =>
+                u.Name != null &&
+                u.Surname != null &&
+                (
+                    (u.Name.Contains(first) &&
+                     u.Surname.Contains(second)) ||
+                    (u.Name.Contains(second) &&
+                     u.Surname.Contains(first))
+                ));
+        }
+        else
+        {
+            query = query.Where(u =>
+                (u.Name != null && u.Name.Contains(search)) ||
+                (u.Surname != null && u.Surname.Contains(search)));
+        }
+
+        return query;
+    }
+
     private async Task SearchUserAsync()
     {
         selectedUser = null;
         balanceMessage = null;
         topUpMessage = null;
         topUpForm = new TopUpForm();
+        userSuggestions.Clear();
 
-        if (balanceForm.UserId <= 0)
+        var search = userSearchText.Trim();
+
+        if (string.IsNullOrWhiteSpace(search))
         {
             balanceMessageClass = "alert-danger";
-            balanceMessage = "Введите корректный ID пользователя.";
+            balanceMessage = "Введите ФИО или ID пользователя.";
             return;
         }
 
         try
         {
-            selectedUser = await Db.Users
-                .AsNoTracking()
-                .SingleOrDefaultAsync(u => u.Id == (uint)balanceForm.UserId);
+            if (uint.TryParse(search, out var id))
+            {
+                if (id > 0)
+                {
+                    selectedUser = await Db.Users
+                        .AsNoTracking()
+                        .SingleOrDefaultAsync(u => u.Id == id);
+                }
+            }
+            else
+            {
+                var matches = await BuildNameSearchQuery(search)
+                    .Take(2)
+                    .ToListAsync();
+
+                if (matches.Count == 1)
+                {
+                    selectedUser = matches[0];
+                }
+                else if (matches.Count > 1)
+                {
+                    userSuggestions = matches;
+
+                    balanceMessageClass = "alert-info";
+                    balanceMessage = "Найдено несколько пользователей. Выберите нужного из списка.";
+                    return;
+                }
+            }
 
             if (selectedUser is null)
             {
                 balanceMessageClass = "alert-warning";
-                balanceMessage = $"Пользователь с ID {balanceForm.UserId} не найден.";
+                balanceMessage = "Пользователь не найден.";
                 return;
             }
 
+            balanceForm.UserId = checked((int)selectedUser.Id);
+            userSearchText =
+                $"{selectedUser.Name} {selectedUser.Surname}";
+
             balanceMessageClass = "alert-success";
             balanceMessage = "Пользователь найден.";
+        }
+        catch (OverflowException)
+        {
+            balanceMessageClass = "alert-danger";
+            balanceMessage = "ID пользователя превышает допустимый диапазон.";
         }
         catch
         {
             balanceMessageClass = "alert-danger";
             balanceMessage = "Не удалось найти пользователя. Проверьте подключение к базе данных.";
+        }
+    }
+
+    private async Task SelectUserAsync(User user)
+    {
+        try
+        {
+            selectedUser = await Db.Users
+                .AsNoTracking()
+                .SingleOrDefaultAsync(u => u.Id == user.Id);
+
+            userSuggestions.Clear();
+            topUpForm = new TopUpForm();
+            topUpMessage = null;
+
+            if (selectedUser is null)
+            {
+                balanceMessageClass = "alert-warning";
+                balanceMessage = "Пользователь больше не найден.";
+                return;
+            }
+
+            balanceForm.UserId = checked((int)selectedUser.Id);
+            userSearchText =
+                $"{selectedUser.Name} {selectedUser.Surname}";
+
+            balanceMessageClass = "alert-success";
+            balanceMessage = "Пользователь найден.";
+        }
+        catch (OverflowException)
+        {
+            selectedUser = null;
+            balanceMessageClass = "alert-danger";
+            balanceMessage = "ID пользователя превышает допустимый диапазон.";
+        }
+        catch
+        {
+            selectedUser = null;
+            balanceMessageClass = "alert-danger";
+            balanceMessage = "Не удалось загрузить данные пользователя.";
         }
     }
 
@@ -367,7 +571,8 @@ else
 
             var newBalance = currentBalance + topUpForm.AmountLvl;
 
-            user.Balance = newBalance.ToString(CultureInfo.InvariantCulture);
+            user.Balance = newBalance.ToString(
+                CultureInfo.InvariantCulture);
 
             var log = new Logspay
             {
