@@ -1,0 +1,372 @@
+@page "/teachers"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin")]
+@rendermode InteractiveServer
+@using admin_blazor.Data
+@using admin_blazor.Models
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.JSInterop
+@inject AppDbContext Db
+@inject IJSRuntime JS
+
+<PageTitle>Преподаватели</PageTitle>
+
+<div class="container-fluid py-3">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h3>Преподаватели</h3>
+        <a class="btn btn-primary" href="/teachers/create">
+            Добавить преподавателя
+        </a>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(operationMessage))
+    {
+        <div class="alert @(operationIsError ? "alert-danger" : "alert-success")"
+             role="alert">
+            @operationMessage
+        </div>
+    }
+
+    <div class="row g-2 mb-3">
+        <div class="col-md-6">
+            <input class="form-control"
+                   placeholder="Поиск по логину или ID"
+                   @bind="searchText"
+                   @bind:event="oninput" />
+        </div>
+
+        <div class="col-md-3">
+            <select class="form-select" @bind="PageSize">
+                <option value="10">10 на странице</option>
+                <option value="25">25 на странице</option>
+                <option value="50">50 на странице</option>
+                <option value="100">100 на странице</option>
+            </select>
+        </div>
+    </div>
+
+    @if (isLoading)
+    {
+        <p>Загрузка преподавателей...</p>
+    }
+    else if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <div class="alert alert-danger" role="alert">
+            @errorMessage
+        </div>
+    }
+    else if (FilteredTeachers.Count == 0)
+    {
+        <div class="alert alert-info">Преподаватели не найдены.</div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-striped table-hover align-middle">
+                <thead>
+                    <tr>
+                        <th>
+                            <button class="btn btn-link p-0 text-decoration-none"
+                                    @onclick="() => SortBy(nameof(Teacher.Id))">
+                                ID @SortIndicator(nameof(Teacher.Id))
+                            </button>
+                        </th>
+                        <th>
+                            <button class="btn btn-link p-0 text-decoration-none"
+                                    @onclick="() => SortBy(nameof(Teacher.Login))">
+                                Логин @SortIndicator(nameof(Teacher.Login))
+                            </button>
+                        </th>
+                        <th class="text-end">Действия</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    @foreach (var teacher in PagedTeachers)
+                    {
+                        <tr @key="teacher.Id">
+                            <td>@teacher.Id</td>
+                            <td>
+                                @(string.IsNullOrWhiteSpace(teacher.Login)
+                                    ? "—"
+                                    : teacher.Login)
+                            </td>
+                            <td class="text-end">
+                                <div class="d-inline-flex gap-2">
+                                    <a class="btn btn-outline-primary btn-sm"
+                                       href="@($"/teachers/{teacher.Id}")">
+                                        Открыть
+                                    </a>
+
+                                    <button type="button"
+                                            class="btn btn-outline-danger btn-sm"
+                                            disabled="@isDeleting"
+                                            @onclick="() => DeleteTeacherAsync(teacher.Id)">
+                                        @(deletingTeacherId == teacher.Id
+                                            ? "Удаление..."
+                                            : "Удалить")
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <span class="text-muted">
+                Всего: @FilteredTeachers.Count
+                @if (FilteredTeachers.Count > 0)
+                {
+                    <text>
+                        · Показаны @((CurrentPage - 1) * PageSize + 1)–@Math.Min(CurrentPage * PageSize, FilteredTeachers.Count)
+                    </text>
+                }
+            </span>
+
+            <div class="btn-group">
+                <button class="btn btn-outline-secondary"
+                        disabled="@(CurrentPage <= 1)"
+                        @onclick="() => ChangePage(CurrentPage - 1)">
+                    Назад
+                </button>
+
+                <button class="btn btn-outline-secondary" disabled>
+                    @CurrentPage / @TotalPages
+                </button>
+
+                <button class="btn btn-outline-secondary"
+                        disabled="@(CurrentPage >= TotalPages)"
+                        @onclick="() => ChangePage(CurrentPage + 1)">
+                    Далее
+                </button>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private List<Teacher> teachers = [];
+    private string searchText = "";
+    private string sortColumn = nameof(Teacher.Id);
+    private bool sortAscending = true;
+    private int pageSize = 25;
+    private int CurrentPage = 1;
+
+    private bool isLoading = true;
+    private bool isDeleting;
+    private uint? deletingTeacherId;
+
+    private string? errorMessage;
+    private string? operationMessage;
+    private bool operationIsError;
+
+    private int PageSize
+    {
+        get => pageSize;
+        set
+        {
+            if (value is not (10 or 25 or 50 or 100))
+                return;
+
+            if (pageSize == value)
+                return;
+
+            pageSize = value;
+            CurrentPage = 1;
+        }
+    }
+
+    private List<Teacher> FilteredTeachers
+    {
+        get
+        {
+            IEnumerable<Teacher> query = teachers;
+
+            if (!string.IsNullOrWhiteSpace(searchText))
+            {
+                var search = searchText.Trim();
+
+                query = query.Where(t =>
+                    (t.Login ?? "").Contains(
+                        search,
+                        StringComparison.OrdinalIgnoreCase)
+                    || t.Id.ToString().Contains(search));
+            }
+
+            query = sortColumn switch
+            {
+                nameof(Teacher.Login) => sortAscending
+                    ? query.OrderBy(t => t.Login)
+                    : query.OrderByDescending(t => t.Login),
+
+                _ => sortAscending
+                    ? query.OrderBy(t => t.Id)
+                    : query.OrderByDescending(t => t.Id)
+            };
+
+            return query.ToList();
+        }
+    }
+
+    private List<Teacher> PagedTeachers =>
+        FilteredTeachers
+            .Skip((CurrentPage - 1) * PageSize)
+            .Take(PageSize)
+            .ToList();
+
+    private int TotalPages =>
+        Math.Max(1, (int)Math.Ceiling(
+            FilteredTeachers.Count / (double)PageSize));
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadTeachersAsync();
+    }
+
+    private async Task LoadTeachersAsync()
+    {
+        isLoading = true;
+        errorMessage = null;
+
+        try
+        {
+            teachers = await Db.Teachers
+                .AsNoTracking()
+                .OrderBy(t => t.Id)
+                .ToListAsync();
+
+            CurrentPage = Math.Clamp(CurrentPage, 1, TotalPages);
+        }
+        catch (Exception)
+        {
+            errorMessage = "Не удалось загрузить список преподавателей.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task DeleteTeacherAsync(uint id)
+    {
+        if (isDeleting)
+            return;
+
+        var teacher = teachers.FirstOrDefault(t => t.Id == id);
+
+        if (teacher is null)
+        {
+            ShowOperationMessage(
+                "Преподаватель не найден в текущем списке.",
+                true);
+            return;
+        }
+
+        var login = string.IsNullOrWhiteSpace(teacher.Login)
+            ? "без логина"
+            : teacher.Login;
+
+        bool confirmed;
+
+        try
+        {
+            confirmed = await JS.InvokeAsync<bool>(
+                "confirm",
+                $"Вы действительно хотите удалить преподавателя «{login}» (ID: {id})?\n\nЭто действие нельзя отменить.");
+        }
+        catch (Exception)
+        {
+            ShowOperationMessage(
+                "Не удалось запросить подтверждение. Удаление не выполнено.",
+                true);
+            return;
+        }
+
+        if (!confirmed)
+            return;
+
+        isDeleting = true;
+        deletingTeacherId = id;
+        operationMessage = null;
+
+        try
+        {
+            var entity = await Db.Teachers
+                .FirstOrDefaultAsync(t => t.Id == id);
+
+            if (entity is null)
+            {
+                teachers.RemoveAll(t => t.Id == id);
+
+                ShowOperationMessage(
+                    "Преподаватель уже отсутствует в базе данных.",
+                    true);
+
+                return;
+            }
+
+            Db.Teachers.Remove(entity);
+            await Db.SaveChangesAsync();
+
+            teachers.RemoveAll(t => t.Id == id);
+
+            CurrentPage = Math.Clamp(CurrentPage, 1, TotalPages);
+
+            ShowOperationMessage(
+                $"Преподаватель «{login}» (ID: {id}) удалён.",
+                false);
+        }
+        catch (DbUpdateException)
+        {
+            ShowOperationMessage(
+                "Не удалось удалить преподавателя. Возможно, с ним связаны другие записи в базе данных.",
+                true);
+        }
+        catch (Exception)
+        {
+            ShowOperationMessage(
+                "Произошла ошибка при удалении преподавателя. Проверьте состояние базы данных.",
+                true);
+        }
+        finally
+        {
+            isDeleting = false;
+            deletingTeacherId = null;
+        }
+    }
+
+    private void ShowOperationMessage(string message, bool isError)
+    {
+        operationMessage = message;
+        operationIsError = isError;
+    }
+
+    private void SortBy(string column)
+    {
+        if (sortColumn == column)
+        {
+            sortAscending = !sortAscending;
+        }
+        else
+        {
+            sortColumn = column;
+            sortAscending = true;
+        }
+
+        CurrentPage = 1;
+    }
+
+    private string SortIndicator(string column)
+    {
+        if (sortColumn != column)
+            return "";
+
+        return sortAscending ? "▲" : "▼";
+    }
+
+    private void ChangePage(int page)
+    {
+        CurrentPage = Math.Clamp(page, 1, TotalPages);
+    }
+}

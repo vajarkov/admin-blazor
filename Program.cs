@@ -128,8 +128,21 @@ app.MapPost("/auth/login", async (
 });
 
 
-app.MapPost("/auth/logout", async (HttpContext context) =>
+a
+app.MapPost("/auth/logout", async (
+    HttpContext context,
+    IAntiforgery antiforgery) =>
 {
+    try
+    {
+        await antiforgery.ValidateRequestAsync(context);
+    }
+    catch (AntiforgeryValidationException)
+    {
+        return Results.BadRequest(
+            "Недействительный токен безопасности. Обновите страницу и попробуйте снова.");
+    }
+
     await context.SignOutAsync(
         CookieAuthenticationDefaults.AuthenticationScheme);
 

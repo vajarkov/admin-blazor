@@ -1,6 +1,6 @@
 ﻿
 @page "/"
-@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin")]
 @using admin_blazor.Data
 @using admin_blazor.Models
 @using Microsoft.EntityFrameworkCore

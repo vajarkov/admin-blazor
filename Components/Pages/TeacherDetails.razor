@@ -1,0 +1,506 @@
+
+@page "/teachers/{Id:int}"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin")]
+@rendermode InteractiveServer
+
+@using admin_blazor.Data
+@using admin_blazor.Models
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Components.Forms
+@using System.Globalization
+@using System.IO
+
+@inject AppDbContext Db
+@inject IWebHostEnvironment Environment
+
+<PageTitle>Преподаватель</PageTitle>
+
+<div class="container-fluid py-3">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h3>Редактирование преподавателя</h3>
+        <a class="btn btn-outline-secondary" href="/teachers">К списку</a>
+    </div>
+
+    @if (isLoading)
+    {
+        <p>Загрузка данных...</p>
+    }
+    else if (teacher is null)
+    {
+        <div class="alert alert-warning">
+            Преподаватель с ID @Id не найден.
+        </div>
+    }
+    else
+    {
+        @if (!string.IsNullOrWhiteSpace(errorMessage))
+        {
+            <div class="alert alert-danger">@errorMessage</div>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(successMessage))
+        {
+            <div class="alert alert-success">@successMessage</div>
+        }
+
+        <EditForm Model="teacher" OnValidSubmit="SaveAsync">
+            <div class="row g-3">
+                <div class="col-12 col-lg-8">
+                    <div class="card">
+                        <div class="card-header">Основные данные</div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label class="form-label">ID</label>
+                                <input class="form-control" value="@teacher.Id" readonly />
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Логин</label>
+                                <InputText class="form-control" @bind-Value="teacher.Login" />
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Образование</label>
+                                <InputText class="form-control" @bind-Value="teacher.Education" />
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Опыт работы, лет</label>
+                                <input type="number" min="0" step="1" class="form-control"
+                                       @bind="expertText" />
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Описание преподавателя</label>
+                                <InputTextArea class="form-control"
+                                               @bind-Value="teacher.Description"
+                                               rows="10" />
+                                <div class="form-text">
+                                    Сохраняется HTML-текст, если он используется в описании.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card mt-3">
+                        <div class="card-header">Стоимость занятий</div>
+                        <div class="card-body">
+                            <div class="row g-3">
+                                <div class="col-12 col-md-4">
+                                    <label class="form-label">00:00–12:00</label>
+                                    <input type="number" min="0" step="1" class="form-control"
+                                           @bind="price1Text" />
+                                </div>
+                                <div class="col-12 col-md-4">
+                                    <label class="form-label">12:00–18:00</label>
+                                    <input type="number" min="0" step="1" class="form-control"
+                                           @bind="price2Text" />
+                                </div>
+                                <div class="col-12 col-md-4">
+                                    <label class="form-label">18:00–00:00</label>
+                                    <input type="number" min="0" step="1" class="form-control"
+                                           @bind="price3Text" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card mt-3">
+                        <div class="card-header">Дополнительные ссылки</div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label class="form-label">YouTube</label>
+                                <InputText class="form-control" @bind-Value="teacher.Youtube" />
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Кабинет</label>
+                                <InputText class="form-control" @bind-Value="teacher.Cabinet" />
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Telegram</label>
+                                <InputText class="form-control" @bind-Value="teacher.Telegram" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-12 col-lg-4">
+                    <div class="card">
+                        <div class="card-header">Аватар</div>
+                        <div class="card-body">
+                            @if (!string.IsNullOrWhiteSpace(teacher.Avatar))
+                            {
+                                <img src="@AvatarUrl"
+                                     alt="Аватар преподавателя"
+                                     class="img-fluid rounded mb-3"
+                                     style="max-width: 240px; max-height: 240px; object-fit: cover;" />
+
+                                <div class="small text-muted text-break mb-3">
+                                    Текущий файл: @teacher.Avatar
+                                </div>
+                            }
+                            else
+                            {
+                                <p class="text-muted">Аватар не задан.</p>
+                            }
+
+                            <div class="mb-3">
+                                <label class="form-label">Выбрать новый аватар</label>
+                                <InputFile OnChange="HandleAvatarSelected"
+                                           accept=".jpg,.jpeg,.png,.webp,.gif"
+                                           class="form-control"
+                                           disabled="@isSaving" />
+
+                                <div class="form-text">
+                                    Допустимые форматы: JPG, PNG, WebP, GIF.
+                                    Максимальный размер — 5 МБ.
+                                    Новый файл загрузится после нажатия кнопки сохранения.
+                                </div>
+                            </div>
+
+                            @if (!string.IsNullOrWhiteSpace(selectedAvatarName))
+                            {
+                                <div class="alert alert-info text-break">
+                                    Выбран новый файл: @selectedAvatarName
+                                </div>
+                            }
+                        </div>
+                    </div>
+
+                    <div class="card mt-3">
+                        <div class="card-header">Смена пароля</div>
+                        <div class="card-body">
+                            <label class="form-label">Новый пароль</label>
+                            <input type="password"
+                                   class="form-control"
+                                   @bind="newPassword"
+                                   autocomplete="new-password"
+                                   disabled="@isSaving" />
+
+                            <div class="form-text">
+                                Оставь поле пустым, чтобы сохранить текущий пароль.
+                                Минимальная длина нового пароля — 8 символов.
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card mt-3">
+                        <div class="card-header">Дополнительные данные</div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label class="form-label">Цена (price)</label>
+                                <input type="number" min="0" step="1" class="form-control"
+                                       @bind="priceText" />
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Имя аватара</label>
+                                <InputText class="form-control" @bind-Value="teacher.Avatar" />
+                                <div class="form-text">
+                                    Обычно это поле изменяется автоматически при загрузке нового файла.
+                                    Ручное изменение имени не загружает файл.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-flex flex-wrap gap-2 mt-4">
+                <button type="submit" class="btn btn-primary" disabled="@isSaving">
+                    @(isSaving ? "Сохранение..." : "Сохранить изменения")
+                </button>
+
+                <a href="/teachers" class="btn btn-outline-secondary">Отмена</a>
+            </div>
+        </EditForm>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    private const long MaxAvatarSize = 5 * 1024 * 1024;
+
+    private static readonly HashSet<string> AllowedAvatarExtensions =
+        new(StringComparer.OrdinalIgnoreCase)
+        {
+            ".jpg",
+            ".jpeg",
+            ".png",
+            ".webp",
+            ".gif"
+        };
+
+    private Teacher? teacher;
+    private IBrowserFile? selectedAvatar;
+    private string? selectedAvatarName;
+
+    private string newPassword = "";
+    private string expertText = "";
+    private string priceText = "";
+    private string price1Text = "";
+    private string price2Text = "";
+    private string price3Text = "";
+
+    private bool isLoading = true;
+    private bool isSaving;
+
+    private string? errorMessage;
+    private string? successMessage;
+
+    private string AvatarUrl
+    {
+        get
+        {
+            var avatar = teacher?.Avatar?.Replace('\\', '/') ?? "";
+            var fileName = avatar[(avatar.LastIndexOf('/') + 1)..];
+
+            return string.IsNullOrWhiteSpace(fileName)
+                ? ""
+                : $"/images/user/teacher/{Uri.EscapeDataString(fileName)}";
+        }
+    }
+
+    private string AvatarDirectory =>
+        Path.Combine(
+            Environment.WebRootPath ?? Path.Combine(Environment.ContentRootPath, "wwwroot"),
+            "images",
+            "user",
+            "teacher");
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            if (Id > 0)
+            {
+                teacher = await Db.Teachers
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(t => t.Id == (uint)Id);
+
+                if (teacher is not null)
+                {
+                    expertText = FormatNumber(teacher.Expert);
+                    priceText = FormatNumber(teacher.Price);
+                    price1Text = FormatNumber(teacher.Price1);
+                    price2Text = FormatNumber(teacher.Price2);
+                    price3Text = FormatNumber(teacher.Price3);
+                }
+            }
+        }
+        catch (Exception)
+        {
+            errorMessage = "Не удалось загрузить данные преподавателя.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void HandleAvatarSelected(InputFileChangeEventArgs e)
+    {
+        errorMessage = null;
+        successMessage = null;
+
+        IBrowserFile file;
+
+        try
+        {
+            file = e.File;
+        }
+        catch (InvalidOperationException)
+        {
+            selectedAvatar = null;
+            selectedAvatarName = null;
+            errorMessage = "Не удалось получить выбранный файл.";
+            return;
+        }
+
+        var extension = Path.GetExtension(file.Name);
+
+        if (!AllowedAvatarExtensions.Contains(extension))
+        {
+            selectedAvatar = null;
+            selectedAvatarName = null;
+            errorMessage = "Выбери изображение в формате JPG, PNG, WebP или GIF.";
+            return;
+        }
+
+        if (file.Size <= 0 || file.Size > MaxAvatarSize)
+        {
+            selectedAvatar = null;
+            selectedAvatarName = null;
+            errorMessage = "Размер изображения должен быть больше нуля и не превышать 5 МБ.";
+            return;
+        }
+
+        selectedAvatar = file;
+        selectedAvatarName = Path.GetFileName(file.Name);
+    }
+
+    private static string FormatNumber(uint? value) =>
+        value?.ToString(CultureInfo.InvariantCulture) ?? "";
+
+    private static bool TryParseOptionalUInt(string value, out uint? result)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            result = null;
+            return true;
+        }
+
+        if (uint.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out var parsed))
+        {
+            result = parsed;
+            return true;
+        }
+
+        result = null;
+        return false;
+    }
+
+    private async Task SaveAsync()
+    {
+        if (teacher is null || isSaving)
+            return;
+
+        errorMessage = null;
+        successMessage = null;
+
+        if (!TryParseOptionalUInt(expertText, out var expert) ||
+            !TryParseOptionalUInt(priceText, out var price) ||
+            !TryParseOptionalUInt(price1Text, out var price1) ||
+            !TryParseOptionalUInt(price2Text, out var price2) ||
+            !TryParseOptionalUInt(price3Text, out var price3))
+        {
+            errorMessage = "Числовые поля должны содержать целые неотрицательные числа в допустимом диапазоне.";
+            return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(newPassword) && newPassword.Length < 8)
+        {
+            errorMessage = "Новый пароль должен содержать не менее 8 символов.";
+            return;
+        }
+
+        isSaving = true;
+
+        string? uploadedAvatarPath = null;
+
+        try
+        {
+            var existing = await Db.Teachers
+                .FirstOrDefaultAsync(t => t.Id == (uint)Id);
+
+            if (existing is null)
+            {
+                errorMessage = "Преподаватель не найден.";
+                return;
+            }
+
+            string? uploadedAvatarFileName = null;
+
+            if (selectedAvatar is not null)
+            {
+                var extension = Path.GetExtension(selectedAvatar.Name);
+
+                if (!AllowedAvatarExtensions.Contains(extension) ||
+                    selectedAvatar.Size <= 0 ||
+                    selectedAvatar.Size > MaxAvatarSize)
+                {
+                    errorMessage = "Выбранный файл не прошёл проверку формата или размера.";
+                    return;
+                }
+
+                Directory.CreateDirectory(AvatarDirectory);
+
+                uploadedAvatarFileName =
+                    $"{Guid.NewGuid():N}{extension.ToLowerInvariant()}";
+
+                uploadedAvatarPath = Path.Combine(
+                    AvatarDirectory,
+                    uploadedAvatarFileName);
+
+                await using (var output = new FileStream(
+                    uploadedAvatarPath,
+                    FileMode.CreateNew,
+                    FileAccess.Write,
+                    FileShare.None))
+                {
+                    await using var input = selectedAvatar.OpenReadStream(MaxAvatarSize);
+                    await input.CopyToAsync(output);
+                }
+            }
+
+            existing.Login = teacher.Login;
+            existing.Education = teacher.Education;
+            existing.Expert = expert;
+            existing.Description = teacher.Description;
+            existing.Youtube = teacher.Youtube;
+            existing.Cabinet = teacher.Cabinet;
+            existing.Price = price;
+            existing.Price1 = price1;
+            existing.Price2 = price2;
+            existing.Price3 = price3;
+            existing.Telegram = teacher.Telegram;
+
+            if (uploadedAvatarFileName is not null)
+            {
+                existing.Avatar = uploadedAvatarFileName;
+            }
+            else
+            {
+                existing.Avatar = teacher.Avatar;
+            }
+
+            if (!string.IsNullOrWhiteSpace(newPassword))
+            {
+                existing.Password = BCrypt.Net.BCrypt.HashPassword(newPassword);
+            }
+
+            await Db.SaveChangesAsync();
+
+            teacher.Avatar = existing.Avatar;
+            teacher.Expert = expert;
+            teacher.Price = price;
+            teacher.Price1 = price1;
+            teacher.Price2 = price2;
+            teacher.Price3 = price3;
+
+            newPassword = "";
+            selectedAvatar = null;
+            selectedAvatarName = null;
+
+            successMessage = "Изменения сохранены.";
+        }
+        catch (Exception)
+        {
+            if (uploadedAvatarPath is not null && File.Exists(uploadedAvatarPath))
+            {
+                try
+                {
+                    File.Delete(uploadedAvatarPath);
+                }
+                catch (IOException)
+                {
+                    // Не удалось удалить новый файл после неудачного сохранения.
+                }
+                catch (UnauthorizedAccessException)
+                {
+                    // Не удалось удалить новый файл после неудачного сохранения.
+                }
+            }
+
+            errorMessage = "Не удалось сохранить изменения. Проверь данные, права на каталог аватаров и подключение к базе.";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+}

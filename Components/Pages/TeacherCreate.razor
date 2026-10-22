@@ -1,0 +1,431 @@
+@page "/teachers/create"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin")]
+@rendermode InteractiveServer
+
+@using admin_blazor.Data
+@using admin_blazor.Models
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.EntityFrameworkCore
+@using System.Globalization
+
+@inject AppDbContext Db
+@inject IWebHostEnvironment Environment
+@inject NavigationManager NavigationManager
+
+<PageTitle>Добавить преподавателя</PageTitle>
+
+<div class="container-fluid py-3">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h3>Добавить преподавателя</h3>
+
+        <a class="btn btn-outline-secondary" href="/teachers">
+            К списку преподавателей
+        </a>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <div class="alert alert-danger" role="alert">
+            @errorMessage
+        </div>
+    }
+
+    <EditForm Model="teacher" OnSubmit="SaveAsync">
+        <div class="card mb-3">
+            <div class="card-header">Основная информация</div>
+
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label" for="login">Логин</label>
+                        <InputText id="login"
+                                   class="form-control"
+                                   @bind-Value="teacher.Login"
+                                   maxlength="191" />
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label" for="education">Образование</label>
+                        <InputText id="education"
+                                   class="form-control"
+                                   @bind-Value="teacher.Education"
+                                   maxlength="191" />
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label" for="expert">Эксперт</label>
+                        <input id="expert"
+                               type="number"
+                               min="0"
+                               step="1"
+                               class="form-control"
+                               @bind="expertInput" />
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label" for="password">Пароль *</label>
+                        <InputText id="password"
+                                   class="form-control"
+                                   type="password"
+                                   autocomplete="new-password"
+                                   @bind-Value="password" />
+                        <div class="form-text">
+                            Минимум 8 символов. Пароль будет сохранён в виде BCrypt-хеша.
+                        </div>
+                    </div>
+
+                    <div class="col-12">
+                        <label class="form-label" for="description">
+                            Описание преподавателя
+                        </label>
+                        <InputTextArea id="description"
+                                       class="form-control"
+                                       rows="8"
+                                       @bind-Value="teacher.Description" />
+                        <div class="form-text">
+                            Поле может содержать HTML-разметку, используемую на сайте.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-header">Стоимость занятий</div>
+
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <label class="form-label" for="price">Цена</label>
+                        <input id="price"
+                               type="number"
+                               min="0"
+                               step="1"
+                               class="form-control"
+                               @bind="priceInput" />
+                    </div>
+
+                    <div class="col-md-3">
+                        <label class="form-label" for="price1">Цена 1</label>
+                        <input id="price1"
+                               type="number"
+                               min="0"
+                               step="1"
+                               class="form-control"
+                               @bind="price1Input" />
+                    </div>
+
+                    <div class="col-md-3">
+                        <label class="form-label" for="price2">Цена 2</label>
+                        <input id="price2"
+                               type="number"
+                               min="0"
+                               step="1"
+                               class="form-control"
+                               @bind="price2Input" />
+                    </div>
+
+                    <div class="col-md-3">
+                        <label class="form-label" for="price3">Цена 3</label>
+                        <input id="price3"
+                               type="number"
+                               min="0"
+                               step="1"
+                               class="form-control"
+                               @bind="price3Input" />
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-header">Ссылки и кабинет</div>
+
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label" for="youtube">YouTube</label>
+                        <InputText id="youtube"
+                                   class="form-control"
+                                   @bind-Value="teacher.Youtube"
+                                   maxlength="255" />
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label" for="telegram">Telegram</label>
+                        <InputText id="telegram"
+                                   class="form-control"
+                                   @bind-Value="teacher.Telegram"
+                                   maxlength="191" />
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label" for="cabinet">Кабинет</label>
+                        <InputText id="cabinet"
+                                   class="form-control"
+                                   @bind-Value="teacher.Cabinet"
+                                   maxlength="191" />
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-header">Аватар</div>
+
+            <div class="card-body">
+                <label class="form-label" for="avatarFile">
+                    Выбрать изображение
+                </label>
+
+                <InputFile id="avatarFile"
+                           class="form-control"
+                           accept=".jpg,.jpeg,.png,.webp,.gif"
+                           OnChange="OnAvatarSelected" />
+
+                <div class="form-text">
+                    Допустимые форматы: JPG, JPEG, PNG, WEBP, GIF.
+                    Максимальный размер — 5 МБ.
+                </div>
+
+                @if (!string.IsNullOrWhiteSpace(selectedAvatarName))
+                {
+                    <p class="mt-2 mb-0">
+                        Выбран файл: @selectedAvatarName
+                    </p>
+                }
+            </div>
+        </div>
+
+        <div class="d-flex flex-wrap gap-2">
+            <button type="submit"
+                    class="btn btn-primary"
+                    disabled="@isSaving">
+                @if (isSaving)
+                {
+                    <span>Сохранение...</span>
+                }
+                else
+                {
+                    <span>Создать преподавателя</span>
+                }
+            </button>
+
+            <a class="btn btn-outline-secondary" href="/teachers">
+                Отмена
+            </a>
+        </div>
+    </EditForm>
+</div>
+
+@code {
+    private const long MaxAvatarSize = 5 * 1024 * 1024;
+
+    private static readonly HashSet<string> AllowedAvatarExtensions =
+        new(StringComparer.OrdinalIgnoreCase)
+        {
+            ".jpg",
+            ".jpeg",
+            ".png",
+            ".webp",
+            ".gif"
+        };
+
+    private readonly Teacher teacher = new();
+
+    private string password = "";
+    private string expertInput = "";
+    private string priceInput = "";
+    private string price1Input = "";
+    private string price2Input = "";
+    private string price3Input = "";
+
+    private string? errorMessage;
+    private string? selectedAvatarName;
+    private IBrowserFile? selectedAvatar;
+    private bool isSaving;
+
+    private void OnAvatarSelected(InputFileChangeEventArgs args)
+    {
+        errorMessage = null;
+        selectedAvatar = null;
+        selectedAvatarName = null;
+
+        var file = args.File;
+
+        if (file.Size <= 0)
+        {
+            errorMessage = "Выбран пустой файл.";
+            return;
+        }
+
+        if (file.Size > MaxAvatarSize)
+        {
+            errorMessage = "Размер аватара не должен превышать 5 МБ.";
+            return;
+        }
+
+        var extension = Path.GetExtension(file.Name);
+
+        if (!AllowedAvatarExtensions.Contains(extension))
+        {
+            errorMessage =
+                "Недопустимый формат аватара. Выберите JPG, PNG, WEBP или GIF.";
+            return;
+        }
+
+        selectedAvatar = file;
+        selectedAvatarName = file.Name;
+    }
+
+    private static bool TryParseNullableUInt(
+        string input,
+        out uint? value)
+    {
+        value = null;
+
+        if (string.IsNullOrWhiteSpace(input))
+            return true;
+
+        if (!uint.TryParse(
+            input,
+            NumberStyles.None,
+            CultureInfo.InvariantCulture,
+            out var parsed))
+        {
+            return false;
+        }
+
+        value = parsed;
+        return true;
+    }
+
+    private async Task SaveAsync(EditContext editContext)
+    {
+        if (isSaving)
+            return;
+
+        errorMessage = null;
+
+        if (string.IsNullOrWhiteSpace(password))
+        {
+            errorMessage = "Укажите пароль преподавателя.";
+            return;
+        }
+
+        if (password.Length < 8)
+        {
+            errorMessage = "Пароль должен содержать не менее 8 символов.";
+            return;
+        }
+
+        if (!TryParseNullableUInt(expertInput, out var expert) ||
+            !TryParseNullableUInt(priceInput, out var price) ||
+            !TryParseNullableUInt(price1Input, out var price1) ||
+            !TryParseNullableUInt(price2Input, out var price2) ||
+            !TryParseNullableUInt(price3Input, out var price3))
+        {
+            errorMessage =
+                "Поля «Эксперт» и стоимости должны содержать целые неотрицательные числа.";
+            return;
+        }
+
+        if (teacher.Login?.Length > 191 ||
+            teacher.Education?.Length > 191 ||
+            teacher.Youtube?.Length > 255 ||
+            teacher.Cabinet?.Length > 191 ||
+            teacher.Telegram?.Length > 191)
+        {
+            errorMessage = "Одно из текстовых полей превышает допустимую длину.";
+            return;
+        }
+
+        if (teacher.Description?.Length > 65535)
+        {
+            errorMessage = "Описание слишком длинное.";
+            return;
+        }
+
+        isSaving = true;
+
+        string? savedAvatarPath = null;
+
+        try
+        {
+            teacher.Expert = expert;
+            teacher.Price = price;
+            teacher.Price1 = price1;
+            teacher.Price2 = price2;
+            teacher.Price3 = price3;
+
+            if (selectedAvatar is not null)
+            {
+                var webRoot = Environment.WebRootPath;
+
+                if (string.IsNullOrWhiteSpace(webRoot))
+                {
+                    webRoot = Path.Combine(
+                        Environment.ContentRootPath,
+                        "wwwroot");
+                }
+
+                var avatarDirectory = Path.Combine(
+                    webRoot,
+                    "images",
+                    "user",
+                    "teacher");
+
+                Directory.CreateDirectory(avatarDirectory);
+
+                var extension = Path.GetExtension(selectedAvatar.Name)
+                    .ToLowerInvariant();
+
+                var fileName = $"{Guid.NewGuid():N}{extension}";
+
+                savedAvatarPath = Path.Combine(avatarDirectory, fileName);
+
+                await using var inputStream =
+                    selectedAvatar.OpenReadStream(MaxAvatarSize);
+
+                await using var outputStream = new FileStream(
+                    savedAvatarPath,
+                    FileMode.CreateNew,
+                    FileAccess.Write,
+                    FileShare.None);
+
+                await inputStream.CopyToAsync(outputStream);
+
+                teacher.Avatar = fileName;
+            }
+
+            teacher.Password = BCrypt.Net.BCrypt.HashPassword(password);
+
+            Db.Teachers.Add(teacher);
+            await Db.SaveChangesAsync();
+
+            NavigationManager.NavigateTo($"/teachers/{teacher.Id}");
+        }
+        catch (Exception)
+        {
+            if (!string.IsNullOrWhiteSpace(savedAvatarPath) &&
+                File.Exists(savedAvatarPath))
+            {
+                try
+                {
+                    File.Delete(savedAvatarPath);
+                }
+                catch
+                {
+                    // Не заменяем исходную ошибку ошибкой удаления файла.
+                }
+            }
+
+            errorMessage =
+                "Не удалось создать преподавателя. Проверь подключение к базе данных и права на запись файлов.";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+}
