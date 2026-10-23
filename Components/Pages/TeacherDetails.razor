@@ -1,4 +1,3 @@
-
 @page "/teachers/{Id:int}"
 @attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin")]
 @rendermode InteractiveServer
@@ -16,9 +15,29 @@
 <PageTitle>Преподаватель</PageTitle>
 
 <div class="container-fluid py-3">
-    <div class="d-flex justify-content-between align-items-center mb-3">
+    <nav aria-label="Навигация по странице" class="mb-3">
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item">
+                <a href="/">Главная</a>
+            </li>
+            <li class="breadcrumb-item">
+                <a href="/teachers">Преподаватели</a>
+            </li>
+            <li class="breadcrumb-item active" aria-current="page">
+                @if (!string.IsNullOrWhiteSpace(teacher?.Login))
+                {
+                    @teacher.Login
+                }
+                else
+                {
+                    @($"Преподаватель №{Id}")
+                }
+            </li>
+        </ol>
+    </nav>
+
+    <div class="mb-3">
         <h3>Редактирование преподавателя</h3>
-        <a class="btn btn-outline-secondary" href="/teachers">К списку</a>
     </div>
 
     @if (isLoading)

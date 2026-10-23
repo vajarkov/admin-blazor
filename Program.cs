@@ -128,7 +128,6 @@ app.MapPost("/auth/login", async (
 });
 
 
-a
 app.MapPost("/auth/logout", async (
     HttpContext context,
     IAntiforgery antiforgery) =>

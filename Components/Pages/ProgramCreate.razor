@@ -1,0 +1,210 @@
+@page "/programs/create"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+
+@using System.ComponentModel.DataAnnotations
+@using System.Security.Cryptography
+@using admin_blazor.Data
+@using admin_blazor.Models
+@using Microsoft.EntityFrameworkCore
+
+@inject AppDbContext Db
+@inject NavigationManager Navigation
+
+<PageTitle>Создание программы — Level English</PageTitle>
+
+<div class="container-fluid px-0">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb mb-3">
+            <li class="breadcrumb-item">
+                <a href="/">Главная</a>
+            </li>
+            <li class="breadcrumb-item">
+                <a href="/programs">Программы</a>
+            </li>
+            <li class="breadcrumb-item active" aria-current="page">
+                Создать новую программу
+            </li>
+        </ol>
+    </nav>
+
+    <div class="mb-4">
+        <h2 class="mb-0">Создать новую программу</h2>
+    </div>
+
+    <div class="row">
+        <div class="col-12 col-xl-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Заполните форму</h5>
+                </div>
+
+                <div class="card-body">
+                    @if (!string.IsNullOrWhiteSpace(errorMessage))
+                    {
+                        <div class="alert alert-danger" role="alert">
+                            @errorMessage
+                        </div>
+                    }
+
+                    <EditForm Model="model" OnValidSubmit="SaveAsync">
+                        <DataAnnotationsValidator />
+
+                        <div class="mb-3">
+                            <label for="course-title" class="form-label">
+                                Название программы
+                            </label>
+                            <InputText id="course-title"
+                                       class="form-control"
+                                       @bind-Value="model.Title" />
+                            <ValidationMessage For="@(() => model.Title)" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="course-level" class="form-label">
+                                Уровень курса
+                            </label>
+                            <InputText id="course-level"
+                                       class="form-control"
+                                       @bind-Value="model.Level" />
+                            <ValidationMessage For="@(() => model.Level)" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="course-price" class="form-label">
+                                Цена курса (тенге)
+                            </label>
+                            <InputNumber id="course-price"
+                                         class="form-control"
+                                         @bind-Value="model.Price" />
+                            <ValidationMessage For="@(() => model.Price)" />
+                        </div>
+
+                        <div class="mb-4">
+                            <label for="course-description" class="form-label">
+                                Описание
+                            </label>
+                            <InputTextArea id="course-description"
+                                           class="form-control"
+                                           rows="6"
+                                           @bind-Value="model.Description" />
+                            <ValidationMessage For="@(() => model.Description)" />
+                        </div>
+
+                        <div class="d-flex flex-wrap gap-2">
+                            <button type="submit"
+                                    class="btn btn-primary"
+                                    disabled="@isSaving">
+                                @if (isSaving)
+                                {
+                                    <span>Сохранение...</span>
+                                }
+                                else
+                                {
+                                    <span>Сохранить</span>
+                                }
+                            </button>
+
+                            <button type="button"
+                                    class="btn btn-outline-secondary"
+                                    disabled="@isSaving"
+                                    @onclick="Cancel">
+                                Отмена
+                            </button>
+                        </div>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private readonly CreateCourseModel model = new()
+    {
+        Price = 0
+    };
+
+    private bool isSaving;
+    private string? errorMessage;
+
+    private async Task SaveAsync()
+    {
+        if (isSaving)
+            return;
+
+        isSaving = true;
+        errorMessage = null;
+
+        try
+        {
+            var course = new Course
+            {
+                VId = await GenerateArticleAsync(),
+                Name = model.Title.Trim(),
+                Price = checked((uint)model.Price),
+                Duration = 50,
+                Level = model.Level.Trim(),
+                Description = model.Description.Trim()
+            };
+
+            Db.Courses.Add(course);
+            await Db.SaveChangesAsync();
+
+            Navigation.NavigateTo("/programs");
+        }
+        catch (DbUpdateException)
+        {
+            errorMessage =
+                "Не удалось сохранить программу в базе данных. Проверь подключение и ограничения таблицы.";
+        }
+        catch (Exception)
+        {
+            errorMessage =
+                "При сохранении программы произошла ошибка. Проверь введённые данные.";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task<uint> GenerateArticleAsync()
+    {
+        for (var attempt = 0; attempt < 20; attempt++)
+        {
+            var article = (uint)RandomNumberGenerator.GetInt32(111111, 1000000);
+
+            var exists = await Db.Courses
+                .AsNoTracking()
+                .AnyAsync(c => c.VId == article);
+
+            if (!exists)
+                return article;
+        }
+
+        throw new InvalidOperationException(
+            "Не удалось подобрать уникальный артикул.");
+    }
+
+    private void Cancel()
+    {
+        Navigation.NavigateTo("/programs");
+    }
+
+    private sealed class CreateCourseModel
+    {
+        [Required(ErrorMessage = "Укажи название программы.")]
+        [StringLength(191, ErrorMessage = "Название не должно превышать 191 символ.")]
+        public string Title { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Укажи уровень курса.")]
+        [StringLength(191, ErrorMessage = "Уровень не должен превышать 191 символ.")]
+        public string Level { get; set; } = string.Empty;
+
+        [Range(0, int.MaxValue, ErrorMessage = "Цена должна быть целым неотрицательным числом.")]
+        public int Price { get; set; }
+
+        [Required(ErrorMessage = "Заполни описание.")]
+        public string Description { get; set; } = string.Empty;
+    }
+}

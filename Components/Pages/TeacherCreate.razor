@@ -15,12 +15,22 @@
 <PageTitle>Добавить преподавателя</PageTitle>
 
 <div class="container-fluid py-3">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h3>Добавить преподавателя</h3>
+    <nav aria-label="Навигация по странице" class="mb-3">
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item">
+                <a href="/">Главная</a>
+            </li>
+            <li class="breadcrumb-item">
+                <a href="/teachers">Преподаватели</a>
+            </li>
+            <li class="breadcrumb-item active" aria-current="page">
+                Добавить преподавателя
+            </li>
+        </ol>
+    </nav>
 
-        <a class="btn btn-outline-secondary" href="/teachers">
-            К списку преподавателей
-        </a>
+    <div class="mb-3">
+        <h3>Добавить преподавателя</h3>
     </div>
 
     @if (!string.IsNullOrWhiteSpace(errorMessage))

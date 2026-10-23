@@ -11,15 +11,25 @@
 <PageTitle>Карточка студента</PageTitle>
 
 <div class="container-fluid py-3">
+    <nav aria-label="Навигация по странице" class="mb-3">
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item">
+                <a href="/">Главная</a>
+            </li>
+            <li class="breadcrumb-item">
+                <a href="/students">Студенты</a>
+            </li>
+            <li class="breadcrumb-item active" aria-current="page">
+                Студент @(student is null ? $"№{Id}" : BreadcrumbStudentName)
+            </li>
+        </ol>
+    </nav>
+
     <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
         <div>
             <h1 class="h3 mb-1">Карточка студента</h1>
             <div class="text-muted">ID: @Id</div>
         </div>
-
-        <a class="btn btn-outline-secondary" href="/students">
-            Назад к списку
-        </a>
     </div>
 
     @if (isLoading)
@@ -205,6 +215,22 @@
     private uint draftStudentType;
     private uint draftUserType;
     private byte draftBan;
+
+    private string BreadcrumbStudentName
+    {
+        get
+        {
+            if (student is null)
+                return $"№{Id}";
+
+            var name = string.Join(" ", new[] { student.Name, student.Surname }
+                .Where(part => !string.IsNullOrWhiteSpace(part)));
+
+            return string.IsNullOrWhiteSpace(name)
+                ? $"№{Id}"
+                : name;
+        }
+    }
 
     protected override async Task OnParametersSetAsync()
     {

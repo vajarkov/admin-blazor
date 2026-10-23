@@ -10,6 +10,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<Config> Configs => Set<Config>();
     public DbSet<Logspay> Logspays => Set<Logspay>();
     public DbSet<Teacher> Teachers => Set<Teacher>();
+    public DbSet<Course> Courses => Set<Course>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -76,6 +77,37 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
             entity.Property(t => t.Price2).HasColumnName("price2");
             entity.Property(t => t.Price3).HasColumnName("price3");
             entity.Property(t => t.Telegram).HasColumnName("telegram");
+        });
+
+        modelBuilder.Entity<Course>(entity =>
+        {
+            entity.ToTable("courses");
+            entity.HasKey(c => c.Id);
+
+            entity.Property(c => c.Id)
+                .HasColumnName("id")
+                .ValueGeneratedOnAdd();
+
+            entity.Property(c => c.VId)
+                .HasColumnName("v_id");
+
+            entity.Property(c => c.Name)
+                .HasColumnName("name")
+                .HasMaxLength(191);
+
+            entity.Property(c => c.Price)
+                .HasColumnName("price");
+
+            entity.Property(c => c.Duration)
+                .HasColumnName("duration");
+
+            entity.Property(c => c.Level)
+                .HasColumnName("level")
+                .HasMaxLength(191);
+
+            entity.Property(c => c.Description)
+                .HasColumnName("description")
+                .HasColumnType("text");
         });
     }
 }

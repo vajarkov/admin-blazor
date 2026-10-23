@@ -1,0 +1,248 @@
+@page "/programs"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+
+@using admin_blazor.Data
+@using admin_blazor.Models
+@using Microsoft.EntityFrameworkCore
+
+@inject AppDbContext Db
+@inject IJSRuntime JS
+
+<PageTitle>Программы — Level English</PageTitle>
+
+<div class="container-fluid px-0">
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
+        <div>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-2">
+                    <li class="breadcrumb-item">
+                        <a href="/">Главная</a>
+                    </li>
+                    <li class="breadcrumb-item active" aria-current="page">
+                        Программы
+                    </li>
+                </ol>
+            </nav>
+
+            <h2 class="mb-0">Программы</h2>
+        </div>
+
+        <a href="/programs/create" class="btn btn-primary">
+            <span class="me-1">+</span>
+            Создать новую программу
+        </a>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(successMessage))
+    {
+        <div class="alert alert-success alert-dismissible" role="status">
+            @successMessage
+            <button type="button"
+                    class="btn-close"
+                    aria-label="Закрыть"
+                    @onclick="() => successMessage = null">
+            </button>
+        </div>
+    }
+
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">Все программы</h5>
+        </div>
+
+        <div class="card-body">
+            @if (isLoading)
+            {
+                <div class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Загрузка...</span>
+                    </div>
+                    <p class="text-muted mt-2 mb-0">
+                        Загружаем программы...
+                    </p>
+                </div>
+            }
+            else if (!string.IsNullOrWhiteSpace(errorMessage))
+            {
+                <div class="alert alert-danger" role="alert">
+                    @errorMessage
+                </div>
+
+                <button class="btn btn-outline-primary"
+                        @onclick="LoadCoursesAsync">
+                    Повторить
+                </button>
+            }
+            else if (courses.Count == 0)
+            {
+                <div class="text-center text-muted py-5">
+                    Программы не найдены.
+                </div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th scope="col">Артикул</th>
+                                <th scope="col">Название</th>
+                                <th scope="col">Уровень</th>
+                                <th scope="col">Цена</th>
+                                <th scope="col">Продолжительность</th>
+                                <th scope="col" class="text-end">Действия</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            @foreach (var course in courses)
+                            {
+                                <tr @key="course.Id">
+                                    <td>
+                                        @(course.VId?.ToString() ?? "—")
+                                    </td>
+
+                                    <td>
+                                        @(course.Name ?? "Без названия")
+                                    </td>
+
+                                    <td>
+                                        @(course.Level ?? "—")
+                                    </td>
+
+                                    <td>
+                                        @(course.Price?.ToString("N0") ?? "—")
+                                        @if (course.Price.HasValue)
+                                        {
+                                            <span> ₸</span>
+                                        }
+                                    </td>
+
+                                    <td>
+                                        @(course.Duration?.ToString() ?? "—")
+                                    </td>
+
+                                    <td class="text-end text-nowrap">
+                                        <a href="@($"/programs/edit/{course.Id}")"
+                                           class="btn btn-sm btn-outline-primary"
+                                           title="Редактировать программу"
+                                           aria-label="@($"Редактировать программу {course.Name}")">
+                                            Редактировать
+                                        </a>
+
+                                        <button type="button"
+                                                class="btn btn-sm btn-outline-danger ms-1"
+                                                title="Удалить программу"
+                                                disabled="@isDeleting"
+                                                @onclick="() => DeleteCourseAsync(course)">
+                                            @(deletingCourseId == course.Id
+                                                ? "Удаление..."
+                                                : "Удалить")
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="text-muted small mt-3">
+                    Всего программ: @courses.Count
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<Course> courses = [];
+    private bool isLoading = true;
+    private bool isDeleting;
+    private uint? deletingCourseId;
+    private string? errorMessage;
+    private string? successMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCoursesAsync();
+    }
+
+    private async Task LoadCoursesAsync()
+    {
+        isLoading = true;
+        errorMessage = null;
+
+        try
+        {
+            courses = await Db.Courses
+                .AsNoTracking()
+                .OrderBy(c => c.Name)
+                .ToListAsync();
+        }
+        catch (Exception)
+        {
+            errorMessage =
+                "Не удалось загрузить программы. Проверь подключение к базе данных.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task DeleteCourseAsync(Course course)
+    {
+        if (isDeleting)
+            return;
+
+        var courseName = string.IsNullOrWhiteSpace(course.Name)
+            ? $"с ID {course.Id}"
+            : $"«{course.Name}»";
+
+        var confirmed = await JS.InvokeAsync<bool>(
+            "confirm",
+            $"Удалить программу {courseName}?\n\nЭто действие нельзя отменить.");
+
+        if (!confirmed)
+            return;
+
+        isDeleting = true;
+        deletingCourseId = course.Id;
+        errorMessage = null;
+        successMessage = null;
+
+        try
+        {
+            var entity = await Db.Courses
+                .FirstOrDefaultAsync(c => c.Id == course.Id);
+
+            if (entity is null)
+            {
+                courses.RemoveAll(c => c.Id == course.Id);
+                successMessage = "Программа уже отсутствует в базе данных.";
+                return;
+            }
+
+            Db.Courses.Remove(entity);
+            await Db.SaveChangesAsync();
+
+            courses.RemoveAll(c => c.Id == course.Id);
+            successMessage = $"Программа {courseName} удалена.";
+        }
+        catch (DbUpdateException)
+        {
+            errorMessage =
+                "Не удалось удалить программу. Возможно, она связана с другими записями.";
+        }
+        catch (Exception)
+        {
+            errorMessage =
+                "При удалении произошла ошибка. Проверь подключение к базе данных.";
+        }
+        finally
+        {
+            isDeleting = false;
+            deletingCourseId = null;
+        }
+    }
+}

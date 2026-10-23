@@ -1,0 +1,295 @@
+
+@page "/programs/edit/{Id}"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+
+@using System.ComponentModel.DataAnnotations
+@using admin_blazor.Data
+@using admin_blazor.Models
+@using Microsoft.EntityFrameworkCore
+
+@inject AppDbContext Db
+@inject NavigationManager Navigation
+
+<PageTitle>Редактирование программы — Level English</PageTitle>
+
+<div class="container-fluid px-0">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb mb-3">
+            <li class="breadcrumb-item">
+                <a href="/">Главная</a>
+            </li>
+            <li class="breadcrumb-item">
+                <a href="/programs">Программы</a>
+            </li>
+            <li class="breadcrumb-item active" aria-current="page">
+                Редактирование
+            </li>
+        </ol>
+    </nav>
+
+    <div class="mb-4">
+        <h2 class="mb-0">Редактирование программы</h2>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="text-center py-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Загрузка...</span>
+            </div>
+            <p class="text-muted mt-2">Загружаем данные программы...</p>
+        </div>
+    }
+    else if (!string.IsNullOrWhiteSpace(errorMessage) && course is null)
+    {
+        <div class="alert alert-danger" role="alert">
+            @errorMessage
+        </div>
+
+        <a href="/programs" class="btn btn-outline-secondary">
+            Вернуться к программам
+        </a>
+    }
+    else if (course is not null)
+    {
+        <div class="row">
+            <div class="col-12 col-xl-8">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Данные программы</h5>
+                    </div>
+
+                    <div class="card-body">
+                        @if (!string.IsNullOrWhiteSpace(errorMessage))
+                        {
+                            <div class="alert alert-danger" role="alert">
+                                @errorMessage
+                            </div>
+                        }
+
+                        @if (!string.IsNullOrWhiteSpace(successMessage))
+                        {
+                            <div class="alert alert-success" role="status">
+                                @successMessage
+                            </div>
+                        }
+
+                        <div class="mb-3">
+                            <label class="form-label">ID записи</label>
+                            <input class="form-control"
+                                   value="@course.Id"
+                                   readonly />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Артикул</label>
+                            <input class="form-control"
+                                   value="@(course.VId?.ToString() ?? "—")"
+                                   readonly />
+                        </div>
+
+                        <EditForm Model="model" OnValidSubmit="SaveAsync">
+                            <DataAnnotationsValidator />
+
+                            <div class="mb-3">
+                                <label for="course-title" class="form-label">
+                                    Название программы
+                                </label>
+                                <InputText id="course-title"
+                                           class="form-control"
+                                           @bind-Value="model.Title" />
+                                <ValidationMessage For="@(() => model.Title)" />
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="course-level" class="form-label">
+                                    Уровень курса
+                                </label>
+                                <InputText id="course-level"
+                                           class="form-control"
+                                           @bind-Value="model.Level" />
+                                <ValidationMessage For="@(() => model.Level)" />
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="course-price" class="form-label">
+                                    Цена курса (тенге)
+                                </label>
+                                <InputNumber id="course-price"
+                                             class="form-control"
+                                             @bind-Value="model.Price" />
+                                <ValidationMessage For="@(() => model.Price)" />
+                            </div>
+
+                            <div class="mb-4">
+                                <label for="course-description" class="form-label">
+                                    Описание
+                                </label>
+                                <InputTextArea id="course-description"
+                                               class="form-control"
+                                               rows="6"
+                                               @bind-Value="model.Description" />
+                                <ValidationMessage For="@(() => model.Description)" />
+                            </div>
+
+                            <div class="d-flex flex-wrap gap-2">
+                                <button type="submit"
+                                        class="btn btn-primary"
+                                        disabled="@isSaving">
+                                    @(isSaving ? "Сохранение..." : "Сохранить изменения")
+                                </button>
+
+                                <button type="button"
+                                        class="btn btn-outline-secondary"
+                                        disabled="@isSaving"
+                                        @onclick="Cancel">
+                                    Отмена
+                                </button>
+
+                                <a href="/programs"
+                                   class="btn btn-outline-secondary">
+                                    Назад к программам
+                                </a>
+                            </div>
+                        </EditForm>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public string Id { get; set; } = string.Empty;
+
+    private Course? course;
+    private readonly EditCourseModel model = new();
+
+    private bool isLoading = true;
+    private bool isSaving;
+    private string? errorMessage;
+    private string? successMessage;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        isLoading = true;
+        errorMessage = null;
+        successMessage = null;
+        course = null;
+
+        if (!uint.TryParse(Id, out var courseId))
+        {
+            errorMessage = "Указан некорректный ID программы.";
+            isLoading = false;
+            return;
+        }
+
+        try
+        {
+            course = await Db.Courses
+                .AsNoTracking()
+                .FirstOrDefaultAsync(c => c.Id == courseId);
+
+            if (course is null)
+            {
+                errorMessage = "Программа не найдена.";
+                return;
+            }
+
+            model.Title = course.Name ?? string.Empty;
+            model.Level = course.Level ?? string.Empty;
+            model.Price = course.Price.HasValue
+                ? checked((int)course.Price.Value)
+                : 0;
+            model.Description = course.Description ?? string.Empty;
+        }
+        catch (Exception)
+        {
+            course = null;
+            errorMessage =
+                "Не удалось загрузить программу. Проверь подключение к базе данных.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        if (isSaving || course is null)
+            return;
+
+        if (!uint.TryParse(Id, out var courseId))
+        {
+            errorMessage = "Указан некорректный ID программы.";
+            return;
+        }
+
+        isSaving = true;
+        errorMessage = null;
+        successMessage = null;
+
+        try
+        {
+            var entity = await Db.Courses
+                .FirstOrDefaultAsync(c => c.Id == courseId);
+
+            if (entity is null)
+            {
+                errorMessage = "Программа больше не существует в базе данных.";
+                return;
+            }
+
+            entity.Name = model.Title.Trim();
+            entity.Level = model.Level.Trim();
+            entity.Price = checked((uint)model.Price);
+            entity.Description = model.Description?.Trim();
+
+            await Db.SaveChangesAsync();
+
+            course.Name = entity.Name;
+            course.Level = entity.Level;
+            course.Price = entity.Price;
+            course.Description = entity.Description;
+
+            successMessage = "Изменения успешно сохранены.";
+        }
+        catch (DbUpdateException)
+        {
+            errorMessage =
+                "Не удалось сохранить изменения в базе данных.";
+        }
+        catch (Exception)
+        {
+            errorMessage =
+                "При сохранении произошла ошибка. Проверь введённые данные.";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private void Cancel()
+    {
+        Navigation.NavigateTo("/programs");
+    }
+
+    private sealed class EditCourseModel
+    {
+        [Required(ErrorMessage = "Укажи название программы.")]
+        [StringLength(191, ErrorMessage = "Название не должно превышать 191 символ.")]
+        public string Title { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Укажи уровень курса.")]
+        [StringLength(191, ErrorMessage = "Уровень не должен превышать 191 символ.")]
+        public string Level { get; set; } = string.Empty;
+
+        [Range(0, int.MaxValue, ErrorMessage = "Цена должна быть целым неотрицательным числом.")]
+        public int Price { get; set; }
+
+        public string Description { get; set; } = string.Empty;
+    }
+}
