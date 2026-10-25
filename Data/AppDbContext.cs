@@ -1,3 +1,4 @@
+
 using admin_blazor.Models;
 using Microsoft.EntityFrameworkCore;
 
@@ -15,6 +16,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<Schedule> Schedules => Set<Schedule>();
     public DbSet<Reserv> Reservs => Set<Reserv>();
     public DbSet<GroupMember> GroupMembers => Set<GroupMember>();
+    public DbSet<DictionaryWord> DictionaryWords => Set<DictionaryWord>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -151,6 +153,23 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
             entity.Property(gm => gm.GroupId).HasColumnName("group_id");
             entity.Property(gm => gm.Student).HasColumnName("student");
             entity.Property(gm => gm.DateTime).HasColumnName("datetime");
+        });
+
+        modelBuilder.Entity<DictionaryWord>(entity =>
+        {
+            entity.ToTable("dictionary");
+            entity.HasKey(w => w.Id);
+            entity.Property(w => w.Id)
+                .HasColumnName("id")
+                .ValueGeneratedOnAdd();
+            entity.Property(w => w.EnglishWord)
+                .HasColumnName("english_word")
+                .HasColumnType("text")
+                .IsRequired();
+            entity.Property(w => w.RussianTranslation)
+                .HasColumnName("russian_translation")
+                .HasColumnType("text")
+                .IsRequired();
         });
     }
 }

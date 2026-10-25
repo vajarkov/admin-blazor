@@ -120,7 +120,7 @@
                 <rect x="13" y="4" width="8" height="7" rx="1.5" />
                 <rect x="3" y="13" width="8" height="7" rx="1.5" />
                 <rect x="13" y="13" width="8" height="7" rx="1.5" />
-            </svg>
+                    </svg>
                 <span class="admin-nav-text">Группы</span>
             </NavLink>
         </div>
@@ -143,17 +143,26 @@
         <div class="admin-nav-group">
             <div class="admin-nav-caption">ИГРЫ</div>
 
-            <span class="admin-nav-link admin-nav-disabled"
-                  title="Словарь">
-                <svg class="admin-nav-icon" viewBox="0 0 24 24"
-                     fill="none" stroke="currentColor"
-                     stroke-width="1.7" aria-hidden="true">
-                    <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v16H6.5A2.5 2.5 0 0 0 4 21z" />
-                    <path d="M4 5.5v13A2.5 2.5 0 0 1 6.5 16H20M9 7h7M9 10h5" />
+            <NavLink class="admin-nav-link"
+                href="/dictionary"
+                Match="NavLinkMatch.All"
+                title="Словарь">
+                <svg class="admin-nav-icon"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.7"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    aria-hidden="true">
+                    <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v16H6.5A2.5 2.5 0 0 0 4 21.5z" />
+                    <path d="M4 5.5v16" />
+                    <path d="M8 7h8" />
+                    <path d="M8 11h6" />
                 </svg>
                 <span class="admin-nav-text">Словарь</span>
-            </span>
-
+            </NavLink>
+            
             <span class="admin-nav-link admin-nav-disabled"
                   title="Наборщик">
                 <svg class="admin-nav-icon" viewBox="0 0 24 24"
