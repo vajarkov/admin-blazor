@@ -1,0 +1,324 @@
+
+@page "/home-settings"
+@using admin_blazor.Models
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Components.Forms
+@inject admin_blazor.Data.AppDbContext Db
+@attribute [Authorize(Roles = "Admin")]
+
+<PageTitle>Главный сайт</PageTitle>
+
+<div class="container-fluid py-3">
+    <nav aria-label="Навигация по странице" class="mb-3">
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item">
+                <a href="/">Главная</a>
+            </li>
+            <li class="breadcrumb-item active" aria-current="page">
+                Главный сайт
+            </li>
+        </ol>
+    </nav>
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+        <h3 class="mb-0">Главный сайт</h3>
+        <a href="/reviews/create" class="btn btn-outline-primary">
+            Добавить отзыв
+        </a>
+    </div>
+
+    @if (isLoading)
+    {
+        <p class="text-muted">Загрузка настроек...</p>
+    }
+    else if (!string.IsNullOrWhiteSpace(loadError))
+    {
+        <div class="alert alert-danger">@loadError</div>
+        <button type="button" class="btn btn-outline-primary" @onclick="LoadSettings">
+            Повторить
+        </button>
+    }
+    else if (settings is null)
+    {
+        <div class="alert alert-warning">
+            Запись с ID = 1 не найдена в таблице home.
+        </div>
+    }
+    else
+    {
+        <EditForm Model="settings" OnValidSubmit="SaveSettings">
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h5 class="mb-0">Настройки сайта</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label">Название шапки в активном состоянии</label>
+                        <InputText class="form-control" @bind-Value="settings.TitleActive" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Название шапки в неактивном состоянии</label>
+                        <InputText class="form-control" @bind-Value="settings.TitleUnactive" />
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h5 class="mb-0">Настройки формы</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label">Ссылка для обработки формы</label>
+                        <InputText class="form-control" @bind-Value="settings.FormLink" />
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h5 class="mb-0">Интро</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label">Заголовок сайта</label>
+                        <InputText class="form-control" @bind-Value="settings.Title" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Подзаголовок сайта</label>
+                        <InputText class="form-control" @bind-Value="settings.Subtitle" />
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h5 class="mb-0">О нас</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label">Заголовок</label>
+                        <InputText class="form-control" @bind-Value="settings.AuTitle" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Подзаголовок</label>
+                        <InputText class="form-control" @bind-Value="settings.AuSubtitle" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Текст 1</label>
+                        <InputTextArea class="form-control" @bind-Value="settings.Text1" rows="5" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Текст 2</label>
+                        <InputTextArea class="form-control" @bind-Value="settings.Text2" rows="5" />
+                    </div>
+
+                    <hr />
+                    <h6 class="mb-3">Преимущества</h6>
+
+                    <div class="mb-3">
+                        <label class="form-label">Мини-заголовок 1</label>
+                        <InputText class="form-control" @bind-Value="settings.MiniTitle1" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Мини-текст 1</label>
+                        <InputTextArea class="form-control" @bind-Value="settings.MiniText1" rows="4" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Мини-заголовок 2</label>
+                        <InputText class="form-control" @bind-Value="settings.MiniTitle2" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Мини-текст 2</label>
+                        <InputTextArea class="form-control" @bind-Value="settings.MiniText2" rows="4" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Мини-заголовок 3</label>
+                        <InputText class="form-control" @bind-Value="settings.MiniTitle3" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Мини-текст 3</label>
+                        <InputTextArea class="form-control" @bind-Value="settings.MiniText3" rows="4" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Мини-заголовок 4</label>
+                        <InputText class="form-control" @bind-Value="settings.MiniTitle4" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Мини-текст 4</label>
+                        <InputTextArea class="form-control" @bind-Value="settings.MiniText4" rows="4" />
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h5 class="mb-0">Пакеты</h5>
+                </div>
+                <div class="card-body">
+                    <h6>Пакет 1</h6>
+                    <div class="mb-3">
+                        <label class="form-label">Название пакета 1</label>
+                        <InputText class="form-control" @bind-Value="settings.Package1" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Цена пакета 1</label>
+                        <InputText class="form-control" @bind-Value="settings.Price1" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Текст пакета 1</label>
+                        <InputText class="form-control" @bind-Value="settings.TextPackage1" />
+                    </div>
+
+                    <hr />
+                    <h6>Пакет 2</h6>
+                    <div class="mb-3">
+                        <label class="form-label">Название пакета 2</label>
+                        <InputText class="form-control" @bind-Value="settings.Package2" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Цена пакета 2</label>
+                        <InputText class="form-control" @bind-Value="settings.Price2" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Текст пакета 2</label>
+                        <InputText class="form-control" @bind-Value="settings.TextPackage2" />
+                    </div>
+
+                    <hr />
+                    <h6>Пакет 3</h6>
+                    <div class="mb-3">
+                        <label class="form-label">Название пакета 3</label>
+                        <InputText class="form-control" @bind-Value="settings.Package3" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Цена пакета 3</label>
+                        <InputText class="form-control" @bind-Value="settings.Price3" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Текст пакета 3</label>
+                        <InputText class="form-control" @bind-Value="settings.TextPackage3" />
+                    </div>
+                </div>
+            </div>
+
+            @if (!string.IsNullOrWhiteSpace(saveMessage))
+            {
+                <div class="alert alert-success">@saveMessage</div>
+            }
+
+            @if (!string.IsNullOrWhiteSpace(saveError))
+            {
+                <div class="alert alert-danger">@saveError</div>
+            }
+
+            <div class="card mb-4">
+                <div class="card-body">
+                    <button type="submit" class="btn btn-primary" disabled="@isSaving">
+                        @(isSaving ? "Сохранение..." : "Сохранить настройки")
+                    </button>
+                </div>
+            </div>
+        </EditForm>
+    }
+</div>
+
+@code {
+    private HomeSetting? settings;
+    private bool isLoading = true;
+    private bool isSaving;
+    private string? loadError;
+    private string? saveError;
+    private string? saveMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadSettings();
+    }
+
+    private async Task LoadSettings()
+    {
+        isLoading = true;
+        loadError = null;
+
+        try
+        {
+            settings = await Db.HomeSettings
+                .AsNoTracking()
+                .FirstOrDefaultAsync(h => h.Id == 1);
+        }
+        catch (Exception)
+        {
+            loadError = "Не удалось загрузить настройки главного сайта.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task SaveSettings()
+    {
+        if (isSaving || settings is null)
+            return;
+
+        isSaving = true;
+        saveError = null;
+        saveMessage = null;
+
+        try
+        {
+            var existing = await Db.HomeSettings
+                .FirstOrDefaultAsync(h => h.Id == 1);
+
+            if (existing is null)
+            {
+                saveError = "Запись home с ID = 1 не найдена. Сохранение отменено.";
+                return;
+            }
+
+            existing.TitleActive = settings.TitleActive;
+            existing.TitleUnactive = settings.TitleUnactive;
+            existing.Title = settings.Title;
+            existing.Subtitle = settings.Subtitle;
+            existing.AuTitle = settings.AuTitle;
+            existing.AuSubtitle = settings.AuSubtitle;
+            existing.Text1 = settings.Text1;
+            existing.Text2 = settings.Text2;
+            existing.MiniTitle1 = settings.MiniTitle1;
+            existing.MiniText1 = settings.MiniText1;
+            existing.MiniTitle2 = settings.MiniTitle2;
+            existing.MiniText2 = settings.MiniText2;
+            existing.MiniTitle3 = settings.MiniTitle3;
+            existing.MiniText3 = settings.MiniText3;
+            existing.MiniTitle4 = settings.MiniTitle4;
+            existing.MiniText4 = settings.MiniText4;
+            existing.Package1 = settings.Package1;
+            existing.Price1 = settings.Price1;
+            existing.TextPackage1 = settings.TextPackage1;
+            existing.Package2 = settings.Package2;
+            existing.Price2 = settings.Price2;
+            existing.TextPackage2 = settings.TextPackage2;
+            existing.Package3 = settings.Package3;
+            existing.Price3 = settings.Price3;
+            existing.TextPackage3 = settings.TextPackage3;
+            existing.FormLink = settings.FormLink;
+
+            await Db.SaveChangesAsync();
+
+            settings = existing;
+            saveMessage = "Настройки главного сайта сохранены.";
+        }
+        catch (Exception)
+        {
+            saveError = "Не удалось сохранить настройки. Проверь данные и подключение к базе.";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+}

@@ -1,0 +1,217 @@
+@page "/privacy-policy"
+@using admin_blazor.Models
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Components.Forms
+@inject admin_blazor.Data.AppDbContext Db
+@attribute [Authorize(Roles = "Admin")]
+
+<PageTitle>Политика конфиденциальности</PageTitle>
+
+<div class="container-fluid py-3">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3 class="mb-0">Политика конфиденциальности</h3>
+
+        @if (!isEditing && policy is not null)
+        {
+            <button class="btn btn-primary" @onclick="StartEditing">
+                Редактировать
+            </button>
+        }
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="text-muted">Загрузка политики...</div>
+    }
+    else if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <div class="alert alert-danger" role="alert">
+            @errorMessage
+        </div>
+
+        <button class="btn btn-outline-primary" @onclick="LoadPolicy">
+            Повторить
+        </button>
+    }
+    else if (isEditing)
+    {
+        <div class="card">
+            <div class="card-body">
+                <EditForm Model="editModel" OnValidSubmit="SavePolicy">
+                    <div class="mb-3">
+                        <label for="policyText" class="form-label">
+                            Текст политики (поддерживается HTML)
+                        </label>
+
+                        <InputTextArea id="policyText"
+                                       class="form-control"
+                                       @bind-Value="editModel.Text"
+                                       rows="18" />
+
+                        <div class="form-text">
+                            HTML-разметка сохраняется как текст.
+                        </div>
+                    </div>
+
+                    @if (!string.IsNullOrWhiteSpace(saveError))
+                    {
+                        <div class="alert alert-danger">
+                            @saveError
+                        </div>
+                    }
+
+                    <div class="d-flex gap-2">
+                        <button type="submit"
+                                class="btn btn-success"
+                                disabled="@isSaving">
+                            @(isSaving ? "Сохранение..." : "Сохранить")
+                        </button>
+
+                        <button type="button"
+                                class="btn btn-outline-secondary"
+                                @onclick="CancelEditing"
+                                disabled="@isSaving">
+                            Отмена
+                        </button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    }
+    else if (policy is null)
+    {
+        <div class="alert alert-warning">
+            Запись политики с ID = 1 не найдена в таблице privacypolicy.
+        </div>
+    }
+    else
+    {
+        <div class="card">
+            <div class="card-body">
+                @if (string.IsNullOrWhiteSpace(policy.Text))
+                {
+                    <p class="text-muted mb-0">Текст политики пуст.</p>
+                }
+                else
+                {
+                    @((MarkupString)policy.Text)
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private admin_blazor.Models.PrivacyPolicy? policy;
+    private PolicyEditModel editModel = new();
+
+    private bool isLoading = true;
+    private bool isEditing;
+    private bool isSaving;
+
+    private string? errorMessage;
+    private string? saveError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadPolicy();
+    }
+
+    private async Task LoadPolicy()
+    {
+        isLoading = true;
+        errorMessage = null;
+
+        try
+        {
+            policy = await Db.PrivacyPolicies
+                .AsNoTracking()
+                .FirstOrDefaultAsync(p => p.Id == 1);
+        }
+        catch (Exception)
+        {
+            errorMessage =
+                "Не удалось загрузить политику. Проверь подключение к базе данных.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void StartEditing()
+    {
+        if (policy is null)
+            return;
+
+        editModel = new PolicyEditModel
+        {
+            Text = policy.Text ?? string.Empty
+        };
+
+        saveError = null;
+        isEditing = true;
+    }
+
+    private void CancelEditing()
+    {
+        isEditing = false;
+        saveError = null;
+    }
+
+    private async Task SavePolicy()
+    {
+        if (isSaving)
+            return;
+
+        isSaving = true;
+        saveError = null;
+
+        try
+        {
+            var existingPolicy = await Db.PrivacyPolicies
+                .FirstOrDefaultAsync(p => p.Id == 1);
+
+            if (existingPolicy is null)
+            {
+                saveError =
+                    "Запись политики с ID = 1 не найдена. Сохранение отменено.";
+                return;
+            }
+
+            if (editModel.Text.Length > 191)
+            {
+                saveError =
+                    "Текст превышает ограничение базы данных в 191 символ. " +
+                    "Перед сохранением длинного текста нужно расширить поле text до TEXT.";
+                return;
+            }
+
+            existingPolicy.Text = editModel.Text;
+
+            await Db.SaveChangesAsync();
+
+            policy = new admin_blazor.Models.PrivacyPolicy
+            {
+                Id = existingPolicy.Id,
+                Text = existingPolicy.Text
+            };
+            isEditing = false;
+        }
+        catch (Exception)
+        {
+            saveError =
+                "Не удалось сохранить политику. Проверь подключение к базе данных.";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private sealed class PolicyEditModel
+    {
+        public string Text { get; set; } = string.Empty;
+    }
+}

@@ -1,0 +1,801 @@
+@page "/schedules"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin")]
+@using admin_blazor.Data
+@using admin_blazor.Models
+@using Microsoft.EntityFrameworkCore
+@using System.Globalization
+@inject AppDbContext Db
+
+<PageTitle>Расписание</PageTitle>
+
+<div class="container-fluid py-3">
+    <nav aria-label="Навигация по странице" class="mb-3">
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item"><a href="/">Главная</a></li>
+            <li class="breadcrumb-item active" aria-current="page">Расписание</li>
+        </ol>
+    </nav>
+
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+        <div>
+            <h1 class="h3 mb-1">Расписание</h1>
+            <div class="text-muted">Календарь занятий преподавателей</div>
+        </div>
+
+        <div style="min-width: 240px;">
+            <label for="teacherSelect" class="form-label">Преподаватель</label>
+            <select id="teacherSelect"
+                    class="form-select"
+                    value="@selectedTeacherId"
+                    @onchange="ChangeTeacherAsync">
+                <option value="0">Выберите преподавателя</option>
+                @foreach (var teacher in teachers)
+                {
+                    <option value="@teacher.Id">@TeacherLabel(teacher)</option>
+                }
+            </select>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(loadError))
+    {
+        <div class="alert alert-danger" role="alert">@loadError</div>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(formError))
+    {
+        <div class="alert alert-danger" role="alert">@formError</div>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(successMessage))
+    {
+        <div class="alert alert-success" role="status">@successMessage</div>
+    }
+
+    @if (isLoading)
+    {
+        <div class="d-flex align-items-center gap-2 text-muted py-4">
+            <span class="spinner-border spinner-border-sm"
+                  role="status" aria-hidden="true"></span>
+            <span>Загрузка расписания…</span>
+        </div>
+    }
+    else if (selectedTeacherId == 0)
+    {
+        <div class="card shadow-sm">
+            <div class="card-body text-muted">
+                Выбери преподавателя, чтобы открыть календарь.
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-body">
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                    <div class="d-flex align-items-center gap-2">
+                        <button type="button"
+                                class="btn btn-outline-secondary btn-sm"
+                                aria-label="Предыдущий месяц"
+                                @onclick="PreviousMonthAsync">
+                            &larr;
+                        </button>
+
+                        <h2 class="h5 mb-0 text-capitalize">
+                            @month.ToString("MMMM yyyy", ruCulture)
+                        </h2>
+
+                        <button type="button"
+                                class="btn btn-outline-secondary btn-sm"
+                                aria-label="Следующий месяц"
+                                @onclick="NextMonthAsync">
+                            &rarr;
+                        </button>
+                    </div>
+
+                    <div class="d-flex flex-wrap gap-2">
+                        <a class="btn btn-outline-primary btn-sm"
+                        href="@($"/teacher-report?teacherId={selectedTeacherId}&month={month.Month}&year={month.Year}")">
+                            Отчёт преподавателя
+                        </a>
+
+                        <button type="button"
+                                class="btn btn-outline-primary btn-sm"
+                                @onclick="GoToTodayAsync">
+                            Сегодня
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card-body">
+                <div class="d-flex flex-wrap gap-3 small mb-3">
+                    <span><span class="badge text-bg-success">&nbsp;</span> Свободные слоты</span>
+                    <span><span class="badge text-bg-primary">&nbsp;</span> Занятые слоты</span>
+                    <span><span class="badge text-bg-danger">&nbsp;</span> Отмены</span>
+                </div>
+
+                <div class="schedule-calendar">
+                    @foreach (var weekday in Weekdays)
+                    {
+                        <div class="schedule-weekday" @key="weekday">
+                            @weekday
+                        </div>
+                    }
+
+                    @foreach (var day in CalendarDays)
+                    {
+                        if (day is null)
+                        {
+                            <div class="schedule-day schedule-day-empty"></div>
+                        }
+                        else
+                        {
+                            var dayInfo = GetDayInfo(day.Value);
+
+                            <button @key="day.Value"
+                                    type="button"
+                                    class="@DayCssClass(day.Value)"
+                                    aria-pressed="@(selectedDate == day.Value)"
+                                    @onclick="() => SelectDateAsync(day.Value)">
+                                <span class="schedule-day-number">@day.Value.Day</span>
+
+                                @if (dayInfo.Free > 0)
+                                {
+                                    <span class="schedule-day-stat text-success">
+                                        Свободно: @dayInfo.Free
+                                    </span>
+                                }
+
+                                @if (dayInfo.Busy > 0)
+                                {
+                                    <span class="schedule-day-stat text-primary">
+                                        Занято: @dayInfo.Busy
+                                    </span>
+                                }
+
+                                @if (dayInfo.Cancelled > 0)
+                                {
+                                    <span class="schedule-day-stat text-danger">
+                                        Отмены: @dayInfo.Cancelled
+                                    </span>
+                                }
+                            </button>
+                        }
+                    }
+                </div>
+
+                <div class="text-muted small mt-3">
+                    Выбери день в календаре, чтобы просмотреть или изменить свободные слоты.
+                </div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm">
+            <div class="card-header bg-body d-flex flex-wrap justify-content-between align-items-center gap-2">
+                <div>
+                    <h2 class="h5 mb-1">
+                        Расписание на @selectedDate.ToString("dd.MM.yyyy")
+                    </h2>
+                    <div class="text-muted small">
+                        Отметь часы, в которые преподаватель доступен для записи.
+                    </div>
+                </div>
+
+                <div class="d-flex flex-wrap gap-2">
+                    <button type="button"
+                            class="btn btn-outline-secondary btn-sm"
+                            @onclick="SelectAllAvailable">
+                        Выбрать свободные часы
+                    </button>
+
+                    <button type="button"
+                            class="btn btn-outline-secondary btn-sm"
+                            @onclick="ClearAvailableSelection">
+                        Очистить выбор
+                    </button>
+                </div>
+            </div>
+
+            <div class="card-body">
+                <div class="row g-2">
+                    @foreach (var slot in DailySlots)
+                    {
+                        <div class="col-6 col-sm-4 col-md-3 col-xl-2" @key="slot.Hour">
+                            <label class="schedule-slot @(slot.IsBusy ? "schedule-slot-busy" : slot.Exists ? "schedule-slot-free" : "schedule-slot-empty")">
+                                <input class="form-check-input me-2"
+                                       type="checkbox"
+                                       disabled="@slot.IsBusy"
+                                       checked="@slot.IsSelected"
+                                       @onchange="args => ToggleSlot(slot, args)" />
+
+                                <span>
+                                    <strong>@($"{slot.Hour:00}:00")</strong>
+                                    <span class="d-block small">
+                                        @if (slot.IsBusy)
+                                        {
+                                            <span>Занято</span>
+                                        }
+                                        else if (slot.Exists)
+                                        {
+                                            <span>Свободно</span>
+                                        }
+                                        else
+                                        {
+                                            <span>Не открыто</span>
+                                        }
+                                    </span>
+                                </span>
+                            </label>
+                        </div>
+                    }
+                </div>
+
+                <hr class="my-4" />
+
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+                    <div class="text-muted small">
+                        Выбрано часов: @selectedHours.Count из 24.
+                        Занятые часы не изменяются.
+                    </div>
+
+                    <button type="button"
+                            class="btn btn-primary"
+                            disabled="@isSaving"
+                            @onclick="SaveScheduleAsync">
+                        @if (isSaving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2"
+                                  role="status" aria-hidden="true"></span>
+                            <span>Сохранение…</span>
+                        }
+                        else
+                        {
+                            <span>Сохранить расписание</span>
+                        }
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+<style>
+    .schedule-calendar {
+        display: grid;
+        grid-template-columns: repeat(7, minmax(0, 1fr));
+        gap: 4px;
+    }
+
+    .schedule-weekday {
+        padding: 8px 2px;
+        text-align: center;
+        font-size: .8rem;
+        font-weight: 600;
+        color: var(--bs-secondary-color);
+    }
+
+    .schedule-day {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 3px;
+        min-width: 0;
+        min-height: 88px;
+        padding: 7px;
+        border: 1px solid var(--bs-border-color);
+        border-radius: 6px;
+        background: var(--bs-body-bg);
+        color: var(--bs-body-color);
+        text-align: left;
+        overflow: hidden;
+    }
+
+    .schedule-day:hover {
+        background: var(--bs-tertiary-bg);
+    }
+
+    .schedule-day-selected {
+        outline: 2px solid var(--bs-primary);
+        outline-offset: -2px;
+        background: var(--bs-primary-bg-subtle);
+    }
+
+    .schedule-day-today .schedule-day-number {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        background: var(--bs-primary);
+        color: white;
+    }
+
+    .schedule-day-empty {
+        border-color: transparent;
+        background: transparent;
+    }
+
+    .schedule-day-number {
+        font-weight: 600;
+        margin-bottom: 2px;
+    }
+
+    .schedule-day-stat {
+        font-size: .68rem;
+        line-height: 1.25;
+        overflow-wrap: anywhere;
+    }
+
+    .schedule-slot {
+        display: flex;
+        align-items: center;
+        width: 100%;
+        min-height: 66px;
+        padding: 10px;
+        border: 1px solid var(--bs-border-color);
+        border-radius: 6px;
+        cursor: pointer;
+    }
+
+    .schedule-slot-free {
+        border-color: var(--bs-success-border-subtle);
+        background: var(--bs-success-bg-subtle);
+    }
+
+    .schedule-slot-busy {
+        border-color: var(--bs-primary-border-subtle);
+        background: var(--bs-primary-bg-subtle);
+        cursor: not-allowed;
+        opacity: .85;
+    }
+
+    .schedule-slot-empty {
+        background: var(--bs-tertiary-bg);
+    }
+
+    .schedule-slot input:disabled {
+        opacity: .65;
+    }
+
+   @@media (max-width: 575.98px) {
+        .schedule-day {
+            min-height: 64px;
+            padding: 4px;
+        }
+
+        .schedule-day-stat {
+            font-size: .58rem;
+        }
+
+        .schedule-weekday {
+            font-size: .7rem;
+        }
+    }
+</style>
+
+@code {
+    private static readonly CultureInfo ruCulture =
+        CultureInfo.GetCultureInfo("ru-RU");
+
+    private static readonly string[] Weekdays =
+        ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
+
+    private static readonly TimeZoneInfo AlmatyTimeZone =
+        TimeZoneInfo.FindSystemTimeZoneById("Asia/Almaty");
+
+    private List<Teacher> teachers = [];
+    private List<Schedule> schedules = [];
+    private List<Reserv> reservations = [];
+
+    private readonly HashSet<int> selectedHours = [];
+
+    private bool isLoading = true;
+    private bool isSaving;
+    private string? loadError;
+    private string? formError;
+    private string? successMessage;
+
+    private uint selectedTeacherId;
+    private DateTime month = new(DateTime.Today.Year, DateTime.Today.Month, 1);
+    private DateTime selectedDate = DateTime.Today;
+
+    private sealed class SlotInfo
+    {
+        public int Hour { get; init; }
+        public long Timestamp { get; init; }
+        public bool Exists { get; set; }
+        public bool IsBusy { get; set; }
+        public bool IsSelected { get; set; }
+    }
+
+    private sealed record DayInfo(int Free, int Busy, int Cancelled);
+
+    private List<SlotInfo> DailySlots { get; set; } = [];
+
+    private IEnumerable<DateTime?> CalendarDays
+    {
+        get
+        {
+            var firstDay = new DateTime(month.Year, month.Month, 1);
+            var offset = ((int)firstDay.DayOfWeek + 6) % 7;
+            var count = DateTime.DaysInMonth(month.Year, month.Month);
+
+            for (var i = 0; i < offset; i++)
+                yield return null;
+
+            for (var day = 1; day <= count; day++)
+                yield return new DateTime(month.Year, month.Month, day);
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            teachers = await Db.Teachers
+                .AsNoTracking()
+                .OrderBy(t => t.Login)
+                .ToListAsync();
+        }
+        catch (Exception ex)
+        {
+            loadError = $"Не удалось загрузить преподавателей: {ex.GetBaseException().Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task ChangeTeacherAsync(ChangeEventArgs args)
+    {
+        if (!uint.TryParse(args.Value?.ToString(), out var teacherId))
+            teacherId = 0;
+
+        selectedTeacherId = teacherId;
+        successMessage = null;
+        formError = null;
+
+        if (selectedTeacherId == 0)
+        {
+            schedules = [];
+            reservations = [];
+            DailySlots = [];
+            selectedHours.Clear();
+            return;
+        }
+
+        await LoadTeacherScheduleAsync();
+        BuildDailySlots();
+    }
+
+    private async Task LoadTeacherScheduleAsync()
+    {
+        isLoading = true;
+        loadError = null;
+
+        try
+        {
+            // В существующей БД заполнено schedules.teacher,
+            // а schedules.teacher_id у записей NULL.
+            schedules = await Db.Schedules
+                .AsNoTracking()
+                .Where(s => s.Teacher == selectedTeacherId)
+                .ToListAsync();
+
+            reservations = await Db.Reservs
+                .AsNoTracking()
+                .Where(r => r.Teacher == selectedTeacherId)
+                .ToListAsync();
+        }
+        catch (Exception ex)
+        {
+            loadError = $"Не удалось загрузить расписание: {ex.GetBaseException().Message}";
+            schedules = [];
+            reservations = [];
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task PreviousMonthAsync()
+    {
+        month = month.AddMonths(-1);
+        await ChangeMonthAsync();
+    }
+
+    private async Task NextMonthAsync()
+    {
+        month = month.AddMonths(1);
+        await ChangeMonthAsync();
+    }
+
+    private async Task GoToTodayAsync()
+    {
+        month = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
+        selectedDate = DateTime.Today;
+        await ChangeMonthAsync();
+        BuildDailySlots();
+    }
+
+    private Task ChangeMonthAsync()
+    {
+        successMessage = null;
+        formError = null;
+        BuildDailySlots();
+
+        return Task.CompletedTask;
+    }
+
+    private async Task SelectDateAsync(DateTime date)
+    {
+        selectedDate = date;
+        successMessage = null;
+        formError = null;
+        BuildDailySlots();
+        await Task.CompletedTask;
+    }
+
+    private void BuildDailySlots()
+    {
+        DailySlots = [];
+        selectedHours.Clear();
+
+        if (selectedTeacherId == 0)
+            return;
+
+        for (var hour = 0; hour < 24; hour++)
+        {
+            var localDateTime = DateTime.SpecifyKind(
+                selectedDate.Date.AddHours(hour),
+                DateTimeKind.Unspecified);
+
+            var utcDateTime = TimeZoneInfo.ConvertTimeToUtc(
+                localDateTime, AlmatyTimeZone);
+
+            var timestamp = new DateTimeOffset(utcDateTime)
+                .ToUnixTimeSeconds();
+
+            var daySchedules = schedules
+                .Where(s => TryGetTimestamp(s.Time, out var value)
+                            && value == timestamp)
+                .ToList();
+
+            var isBusy = daySchedules.Any(s =>
+                s.Reserv.HasValue && s.Reserv.Value != 0);
+
+            var exists = daySchedules.Any(s =>
+                s.Reserv.HasValue && s.Reserv.Value == 0);
+
+            var slot = new SlotInfo
+            {
+                Hour = hour,
+                Timestamp = timestamp,
+                Exists = exists,
+                IsBusy = isBusy,
+                IsSelected = exists && !isBusy
+            };
+
+            if (slot.IsSelected)
+                selectedHours.Add(hour);
+
+            DailySlots.Add(slot);
+        }
+    }
+
+    private DayInfo GetDayInfo(DateTime date)
+    {
+        var daySlots = schedules
+            .Where(s => TryGetTimestamp(s.Time, out var timestamp)
+                        && TimestampToAlmatyDate(timestamp) == date.Date)
+            .ToList();
+
+        var free = daySlots.Count(s =>
+            s.Reserv.HasValue && s.Reserv.Value == 0);
+
+        var busy = daySlots.Count(s =>
+            s.Reserv.HasValue && s.Reserv.Value != 0);
+
+        var cancelled = reservations.Count(r =>
+            r.Status == 0
+            && r.Timecode.HasValue
+            && TimestampToAlmatyDate(r.Timecode.Value) == date.Date);
+
+        return new DayInfo(free, busy, cancelled);
+    }
+
+    private string DayCssClass(DateTime date)
+    {
+        var classes = "schedule-day";
+
+        if (date.Date == selectedDate.Date)
+            classes += " schedule-day-selected";
+
+        if (date.Date == DateTime.Today)
+            classes += " schedule-day-today";
+
+        return classes;
+    }
+
+    private void ToggleSlot(SlotInfo slot, ChangeEventArgs args)
+    {
+        if (slot.IsBusy)
+            return;
+
+        var isChecked = bool.TryParse(args.Value?.ToString(), out var value)
+                        && value;
+
+        slot.IsSelected = isChecked;
+
+        if (isChecked)
+            selectedHours.Add(slot.Hour);
+        else
+            selectedHours.Remove(slot.Hour);
+    }
+
+    private void SelectAllAvailable()
+    {
+        foreach (var slot in DailySlots.Where(s => !s.IsBusy))
+        {
+            slot.IsSelected = true;
+            selectedHours.Add(slot.Hour);
+        }
+    }
+
+    private void ClearAvailableSelection()
+    {
+        foreach (var slot in DailySlots.Where(s => !s.IsBusy))
+        {
+            slot.IsSelected = false;
+            selectedHours.Remove(slot.Hour);
+        }
+    }
+
+    private async Task SaveScheduleAsync()
+    {
+        formError = null;
+        successMessage = null;
+
+        if (selectedTeacherId == 0)
+        {
+            formError = "Сначала выбери преподавателя.";
+            return;
+        }
+
+        isSaving = true;
+
+        try
+        {
+            // Загружаем актуальные записи перед изменением:
+            // нельзя полагаться только на ранее загруженный календарь.
+            var currentSchedules = await Db.Schedules
+                .Where(s => s.Teacher == selectedTeacherId)
+                .ToListAsync();
+
+            var currentDaySchedules = currentSchedules
+                .Where(s => TryGetTimestamp(s.Time, out var timestamp)
+                            && TimestampToAlmatyDate(timestamp) == selectedDate.Date)
+                .ToList();
+
+            // Удаляем только свободные слоты выбранного дня.
+            // Любая запись с ненулевым reserv остаётся нетронутой.
+            var freeSlotsToDelete = currentDaySchedules
+                .Where(s => s.Reserv.HasValue && s.Reserv.Value == 0)
+                .ToList();
+
+            Db.Schedules.RemoveRange(freeSlotsToDelete);
+
+            var occupiedHours = currentDaySchedules
+                .Where(s => s.Reserv.HasValue && s.Reserv.Value != 0)
+                .Select(s => GetHourFromTimestamp(s.Time))
+                .Where(h => h.HasValue)
+                .Select(h => h!.Value)
+                .ToHashSet();
+
+            foreach (var hour in selectedHours.OrderBy(h => h))
+            {
+                if (occupiedHours.Contains(hour))
+                    continue;
+
+                var localDateTime = DateTime.SpecifyKind(
+                    selectedDate.Date.AddHours(hour),
+                    DateTimeKind.Unspecified);
+
+                var utcDateTime = TimeZoneInfo.ConvertTimeToUtc(
+                    localDateTime, AlmatyTimeZone);
+
+                var timestamp = new DateTimeOffset(utcDateTime)
+                    .ToUnixTimeSeconds();
+
+                if (timestamp < 0 || timestamp > uint.MaxValue)
+                    throw new InvalidOperationException(
+                        "Время выходит за допустимый диапазон старой базы.");
+
+                var dateText = selectedDate.ToString(
+                    "dd.MM.yyyy", CultureInfo.InvariantCulture);
+
+                // Проверяем существующий свободный слот: его могли
+                // уже создать параллельно с открытой страницей.
+                var alreadyExists = currentDaySchedules.Any(s =>
+                    TryGetTimestamp(s.Time, out var existingTimestamp)
+                    && existingTimestamp == timestamp);
+
+                if (alreadyExists)
+                    continue;
+
+                var now = DateTimeOffset.Now.ToUnixTimeSeconds();
+
+                if (now < 0 || now > uint.MaxValue)
+                    throw new InvalidOperationException(
+                        "Текущее время выходит за допустимый диапазон старой базы.");
+
+                Db.Schedules.Add(new Schedule
+                {
+                    Teacher = selectedTeacherId,
+                    Date = dateText,
+                    Time = timestamp.ToString(CultureInfo.InvariantCulture),
+                    CreateTime = (uint)now,
+                    Reserv = 0
+                });
+            }
+
+            await Db.SaveChangesAsync();
+
+            successMessage = "Расписание сохранено.";
+
+            await LoadTeacherScheduleAsync();
+            BuildDailySlots();
+        }
+        catch (Exception ex)
+        {
+            Db.ChangeTracker.Clear();
+            formError = $"Не удалось сохранить расписание: {ex.GetBaseException().Message}";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private static int? GetHourFromTimestamp(string? value)
+    {
+        if (!TryGetTimestamp(value, out var timestamp))
+            return null;
+
+        return TimestampToAlmatyDateTime(timestamp).Hour;
+    }
+
+    private static bool TryGetTimestamp(string? value, out long timestamp)
+    {
+        return long.TryParse(
+            value,
+            NumberStyles.Integer,
+            CultureInfo.InvariantCulture,
+            out timestamp);
+    }
+
+    private static DateTime TimestampToAlmatyDateTime(long timestamp)
+    {
+        try
+        {
+            var utc = DateTimeOffset.FromUnixTimeSeconds(timestamp).UtcDateTime;
+            return TimeZoneInfo.ConvertTimeFromUtc(utc, AlmatyTimeZone);
+        }
+        catch (ArgumentOutOfRangeException)
+        {
+            return DateTime.MinValue;
+        }
+    }
+
+    private static DateTime TimestampToAlmatyDate(long timestamp) =>
+        TimestampToAlmatyDateTime(timestamp).Date;
+
+    private static string TeacherLabel(Teacher teacher) =>
+        string.IsNullOrWhiteSpace(teacher.Login)
+            ? $"Преподаватель #{teacher.Id}"
+            : $"{teacher.Login} (ID {teacher.Id})";
+}

@@ -7,6 +7,8 @@ namespace admin_blazor.Data;
 public class AppDbContext(DbContextOptions<AppDbContext> options)
     : DbContext(options)
 {
+    
+    public DbSet<Rule> Rules => Set<Rule>();
     public DbSet<User> Users => Set<User>();
     public DbSet<Config> Configs => Set<Config>();
     public DbSet<Logspay> Logspays => Set<Logspay>();
@@ -17,9 +19,28 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<Reserv> Reservs => Set<Reserv>();
     public DbSet<GroupMember> GroupMembers => Set<GroupMember>();
     public DbSet<DictionaryWord> DictionaryWords => Set<DictionaryWord>();
+    public DbSet<PrivacyPolicy> PrivacyPolicies => Set<PrivacyPolicy>();
+    public DbSet<HomeSetting> HomeSettings => Set<HomeSetting>();
+    public DbSet<Review> Reviews => Set<Review>();
+    public DbSet<Subscription> Subscriptions => Set<Subscription>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<Rule>(entity =>
+        {
+            entity.ToTable("rules");
+
+            entity.HasKey(r => r.Id);
+
+            entity.Property(r => r.Id)
+                .HasColumnName("id")
+                .ValueGeneratedOnAdd();
+
+            entity.Property(r => r.Text)
+                .HasColumnName("text")
+                .HasColumnType("text");
+        });
+
         modelBuilder.Entity<User>(entity =>
         {
             entity.ToTable("users");
@@ -171,5 +192,110 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
                 .HasColumnType("text")
                 .IsRequired();
         });
+
+        modelBuilder.Entity<PrivacyPolicy>(entity =>
+        {
+            entity.ToTable("privacypolicy");
+
+            entity.HasKey(p => p.Id);
+
+            entity.Property(p => p.Id)
+                .HasColumnName("id")
+                .ValueGeneratedOnAdd();
+
+            entity.Property(p => p.Text)
+                .HasColumnName("text")
+                .HasMaxLength(191)
+                .IsUnicode();
+        });
+
+        modelBuilder.Entity<HomeSetting>(entity =>
+        {
+            entity.ToTable("home");
+
+            entity.HasKey(h => h.Id);
+
+            entity.Property(h => h.Id)
+                .HasColumnName("id")
+                .ValueGeneratedOnAdd();
+
+            entity.Property(h => h.TitleActive).HasColumnName("titleactive").HasMaxLength(191);
+            entity.Property(h => h.TitleUnactive).HasColumnName("titleunactive").HasMaxLength(191);
+            entity.Property(h => h.Title).HasColumnName("title").HasMaxLength(191);
+            entity.Property(h => h.Subtitle).HasColumnName("subtitle").HasMaxLength(191);
+
+            entity.Property(h => h.AuTitle).HasColumnName("autitle").HasMaxLength(191);
+            entity.Property(h => h.AuSubtitle).HasColumnName("ausubtitle").HasMaxLength(191);
+            entity.Property(h => h.Text1).HasColumnName("text1").HasColumnType("text");
+            entity.Property(h => h.Text2).HasColumnName("text2").HasMaxLength(255);
+
+            entity.Property(h => h.MiniTitle1).HasColumnName("minititle1").HasMaxLength(191);
+            entity.Property(h => h.MiniText1).HasColumnName("minitext1").HasColumnType("text");
+            entity.Property(h => h.MiniTitle2).HasColumnName("minititle2").HasMaxLength(191);
+            entity.Property(h => h.MiniText2).HasColumnName("minitext2").HasColumnType("text");
+            entity.Property(h => h.MiniTitle3).HasColumnName("minititle3").HasMaxLength(191);
+            entity.Property(h => h.MiniText3).HasColumnName("minitext3").HasColumnType("text");
+            entity.Property(h => h.MiniTitle4).HasColumnName("minititle4").HasMaxLength(191);
+            entity.Property(h => h.MiniText4).HasColumnName("minitext4").HasColumnType("text");
+
+            entity.Property(h => h.Package1).HasColumnName("package1").HasMaxLength(191);
+            entity.Property(h => h.Price1).HasColumnName("price1").HasMaxLength(191);
+            entity.Property(h => h.TextPackage1).HasColumnName("textpackage1").HasMaxLength(191);
+
+            entity.Property(h => h.Package2).HasColumnName("package2").HasMaxLength(191);
+            entity.Property(h => h.Price2).HasColumnName("price2").HasMaxLength(191);
+            entity.Property(h => h.TextPackage2).HasColumnName("textpackage2").HasMaxLength(191);
+
+            entity.Property(h => h.Package3).HasColumnName("package3").HasMaxLength(191);
+            entity.Property(h => h.Price3).HasColumnName("price3").HasMaxLength(191);
+            entity.Property(h => h.TextPackage3).HasColumnName("textpackage3").HasMaxLength(191);
+
+            entity.Property(h => h.FormLink).HasColumnName("formlink").HasMaxLength(191);
+        });
+        modelBuilder.Entity<Review>(entity =>
+        {
+            entity.ToTable("review");
+
+            entity.HasKey(r => r.Id);
+
+            entity.Property(r => r.Id)
+                .HasColumnName("id")
+                .ValueGeneratedOnAdd();
+
+            entity.Property(r => r.Fname)
+                .HasColumnName("fname")
+                .HasMaxLength(191);
+
+            entity.Property(r => r.Lname)
+                .HasColumnName("lname")
+                .HasMaxLength(191);
+
+            entity.Property(r => r.Rtext)
+                .HasColumnName("rtext")
+                .HasColumnType("text");
+        });
+
+        modelBuilder.Entity<Subscription>(entity =>
+        {
+            entity.ToTable("subscription");
+
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Id)
+                .HasColumnName("id");
+
+            entity.Property(e => e.Title)
+                .HasColumnName("title");
+
+            entity.Property(e => e.Price)
+                .HasColumnName("price");
+
+            entity.Property(e => e.Descr)
+                .HasColumnName("descr");
+
+            entity.Property(e => e.Pages)
+                .HasColumnName("pages");
+});
+
     }
 }

@@ -1,0 +1,486 @@
+
+@page "/subscriptions"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin")]
+@using admin_blazor.Data
+@using admin_blazor.Models
+@using Microsoft.EntityFrameworkCore
+@using System.Globalization
+@inject AppDbContext Db
+
+<PageTitle>Подписки</PageTitle>
+
+<div class="container-fluid py-3">
+    <nav aria-label="Навигация по странице" class="mb-3">
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item"><a href="/">Главная</a></li>
+            <li class="breadcrumb-item active" aria-current="page">
+                Подписки
+            </li>
+        </ol>
+    </nav>
+
+    <div class="d-flex flex-wrap justify-content-between
+                align-items-center gap-3 mb-4">
+        <div>
+            <h1 class="h3 mb-1">Подписки</h1>
+            <div class="text-muted">Всего подписок: @subscriptions.Count</div>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(loadError))
+    {
+        <div class="alert alert-danger" role="alert">@loadError</div>
+    }
+
+    @if (isLoading)
+    {
+        <div class="d-flex align-items-center gap-2 text-muted py-4">
+            <span class="spinner-border spinner-border-sm"
+                  role="status" aria-hidden="true"></span>
+            <span>Загрузка подписок…</span>
+        </div>
+    }
+    else
+    {
+        @if (!string.IsNullOrWhiteSpace(successMessage))
+        {
+            <div class="alert alert-success" role="status">
+                @successMessage
+            </div>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(formError))
+        {
+            <div class="alert alert-danger" role="alert">
+                @formError
+            </div>
+        }
+
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-body">
+                <h2 class="h5 mb-0">
+                    @(editingId.HasValue
+                        ? $"Редактирование подписки #{editingId}"
+                        : "Создать подписку")
+                </h2>
+            </div>
+
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-12 col-lg-5">
+                        <label for="subscriptionTitle" class="form-label">
+                            Название
+                        </label>
+                        <input id="subscriptionTitle"
+                               class="form-control"
+                               maxlength="191"
+                               @bind="title"
+                               @bind:event="oninput" />
+                    </div>
+
+                    <div class="col-12 col-md-4 col-lg-3">
+                        <label for="subscriptionPrice" class="form-label">
+                            Цена
+                        </label>
+                        <input id="subscriptionPrice"
+                               type="number"
+                               min="0"
+                               step="1"
+                               class="form-control"
+                               @bind="priceText"
+                               @bind:event="oninput" />
+                    </div>
+
+                    @if (!editingId.HasValue)
+                    {
+                        <div class="col-12 col-lg-4">
+                            <label for="subscriptionPages"
+                                   class="form-label">
+                                Страницы
+                            </label>
+                            <input id="subscriptionPages"
+                                   class="form-control"
+                                   maxlength="191"
+                                   placeholder="Например: 1,2,3"
+                                   @bind="pages"
+                                   @bind:event="oninput" />
+                            <div class="form-text">
+                                Вводи номера через запятую, как в старой системе.
+                            </div>
+                        </div>
+                    }
+                </div>
+
+                <div class="d-flex flex-wrap gap-2 mt-4">
+                    <button type="button"
+                            class="btn btn-primary"
+                            disabled="@isSaving"
+                            @onclick="SaveAsync">
+                        @if (isSaving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2"
+                                  role="status" aria-hidden="true"></span>
+                            <span>Сохранение…</span>
+                        }
+                        else
+                        {
+                            <span>
+                                @(editingId.HasValue
+                                    ? "Сохранить изменения"
+                                    : "Создать подписку")
+                            </span>
+                        }
+                    </button>
+
+                    @if (editingId.HasValue)
+                    {
+                        <button type="button"
+                                class="btn btn-outline-secondary"
+                                disabled="@isSaving"
+                                @onclick="CancelEdit">
+                            Отмена
+                        </button>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm">
+            <div class="card-header bg-body">
+                <h2 class="h5 mb-0">Существующие подписки</h2>
+            </div>
+
+            <div class="card-body">
+                @if (subscriptions.Count == 0)
+                {
+                    <div class="text-muted">Подписок пока нет.</div>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-hover table-striped
+                                      align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Название</th>
+                                    <th>Цена</th>
+                                    <th>Страницы</th>
+                                    <th style="min-width: 210px;">Действия</th>
+                                </tr>
+                            </thead>
+
+                            <tbody>
+                                @foreach (var subscription in subscriptions)
+                                {
+                                    <tr @key="subscription.Id">
+                                        <td>@subscription.Id</td>
+                                        <td>
+                                            @(string.IsNullOrWhiteSpace(
+                                                subscription.Title)
+                                                ? "—"
+                                                : subscription.Title)
+                                        </td>
+                                        <td>@FormatPrice(subscription.Price)</td>
+                                        <td>
+                                            @(string.IsNullOrWhiteSpace(
+                                                subscription.Pages)
+                                                ? "—"
+                                                : subscription.Pages)
+                                        </td>
+                                        <td>
+                                            @if (pendingDeleteId == subscription.Id)
+                                            {
+                                                <div class="d-flex flex-wrap
+                                                            align-items-center gap-2">
+                                                    <span class="small text-danger">
+                                                        Удалить?
+                                                    </span>
+                                                    <button type="button"
+                                                            class="btn btn-sm btn-danger"
+                                                            disabled="@isSaving"
+                                                            @onclick="() => DeleteAsync(subscription.Id)">
+                                                        Да
+                                                    </button>
+                                                    <button type="button"
+                                                            class="btn btn-sm btn-outline-secondary"
+                                                            @onclick="CancelDelete">
+                                                        Нет
+                                                    </button>
+                                                </div>
+                                            }
+                                            else
+                                            {
+                                                <div class="d-flex flex-wrap gap-2">
+                                                    <button type="button"
+                                                            class="btn btn-sm btn-outline-primary"
+                                                            disabled="@isSaving"
+                                                            @onclick="() => BeginEdit(subscription)">
+                                                        Изменить
+                                                    </button>
+                                                    <button type="button"
+                                                            class="btn btn-sm btn-outline-danger"
+                                                            disabled="@isSaving"
+                                                            @onclick="() => AskDelete(subscription.Id)">
+                                                        Удалить
+                                                    </button>
+                                                </div>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private List<Subscription> subscriptions = [];
+
+    private bool isLoading = true;
+    private bool isSaving;
+
+    private string? loadError;
+    private string? formError;
+    private string? successMessage;
+
+    private uint? editingId;
+    private uint? pendingDeleteId;
+
+    private string title = string.Empty;
+    private string priceText = string.Empty;
+    private string pages = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        isLoading = true;
+        loadError = null;
+
+        try
+        {
+            subscriptions = await Db.Subscriptions
+                .AsNoTracking()
+                .OrderByDescending(item => item.Id)
+                .ToListAsync();
+        }
+        catch (Exception ex)
+        {
+            loadError =
+                $"Не удалось загрузить подписки: {ex.GetBaseException().Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        formError = null;
+        successMessage = null;
+
+        var normalizedTitle = title.Trim();
+        var normalizedPages = pages.Trim();
+
+        if (string.IsNullOrWhiteSpace(normalizedTitle))
+        {
+            formError = "Введите название подписки.";
+            return;
+        }
+
+        if (normalizedTitle.Length > 191)
+        {
+            formError = "Название не должно превышать 191 символ.";
+            return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(priceText))
+        {
+            if (!uint.TryParse(
+                    priceText,
+                    NumberStyles.None,
+                    CultureInfo.InvariantCulture,
+                    out _))
+            {
+                formError = "Цена должна быть целым неотрицательным числом.";
+                return;
+            }
+        }
+
+        uint? parsedPrice = null;
+
+        if (!string.IsNullOrWhiteSpace(priceText))
+        {
+            parsedPrice = uint.Parse(
+                priceText,
+                NumberStyles.None,
+                CultureInfo.InvariantCulture);
+        }
+
+        if (!editingId.HasValue && normalizedPages.Length > 191)
+        {
+            formError = "Список страниц не должен превышать 191 символ.";
+            return;
+        }
+
+        isSaving = true;
+
+        try
+        {
+            if (editingId.HasValue)
+            {
+                var subscription = await Db.Subscriptions
+                    .FirstOrDefaultAsync(item => item.Id == editingId.Value);
+
+                if (subscription is null)
+                {
+                    formError = "Подписка не найдена. Обнови страницу.";
+                    return;
+                }
+
+                // Как в старом update-subs.php:
+                // редактируем только название и цену.
+                subscription.Title = normalizedTitle;
+                subscription.Price = parsedPrice;
+
+                await Db.SaveChangesAsync();
+
+                successMessage =
+                    $"Подписка #{subscription.Id} успешно обновлена.";
+            }
+            else
+            {
+                var subscription = new Subscription
+                {
+                    Title = normalizedTitle,
+                    Price = parsedPrice,
+                    Pages = string.IsNullOrWhiteSpace(normalizedPages)
+                        ? null
+                        : normalizedPages,
+
+                    // Старый обработчик получал post_content,
+                    // но в предоставленной форме этого поля нет.
+                    // Не подменяем им tinyint-столбец descr.
+                    Descr = null
+                };
+
+                Db.Subscriptions.Add(subscription);
+                await Db.SaveChangesAsync();
+
+                successMessage =
+                    $"Подписка «{normalizedTitle}» создана.";
+            }
+
+            ResetForm();
+            await LoadDataAsync();
+        }
+        catch (Exception ex)
+        {
+            Db.ChangeTracker.Clear();
+
+            formError =
+                $"Не удалось сохранить подписку: {ex.GetBaseException().Message}";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private void BeginEdit(Subscription subscription)
+    {
+        formError = null;
+        successMessage = null;
+        pendingDeleteId = null;
+
+        editingId = subscription.Id;
+        title = subscription.Title ?? string.Empty;
+        priceText = subscription.Price?.ToString(
+            CultureInfo.InvariantCulture) ?? string.Empty;
+
+        // Старый обработчик редактирования не изменял pages.
+        pages = string.Empty;
+    }
+
+    private void CancelEdit()
+    {
+        ResetForm();
+        formError = null;
+    }
+
+    private void AskDelete(uint id)
+    {
+        formError = null;
+        successMessage = null;
+        pendingDeleteId = id;
+    }
+
+    private void CancelDelete()
+    {
+        pendingDeleteId = null;
+    }
+
+    private async Task DeleteAsync(uint id)
+    {
+        formError = null;
+        successMessage = null;
+        isSaving = true;
+
+        try
+        {
+            var subscription = await Db.Subscriptions
+                .FirstOrDefaultAsync(item => item.Id == id);
+
+            if (subscription is null)
+            {
+                formError = "Подписка уже отсутствует в базе.";
+                pendingDeleteId = null;
+                return;
+            }
+
+            Db.Subscriptions.Remove(subscription);
+            await Db.SaveChangesAsync();
+
+            if (editingId == id)
+                ResetForm();
+
+            pendingDeleteId = null;
+            successMessage = $"Подписка #{id} удалена.";
+
+            await LoadDataAsync();
+        }
+        catch (Exception ex)
+        {
+            Db.ChangeTracker.Clear();
+
+            formError =
+                $"Не удалось удалить подписку: {ex.GetBaseException().Message}";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private void ResetForm()
+    {
+        editingId = null;
+        title = string.Empty;
+        priceText = string.Empty;
+        pages = string.Empty;
+    }
+
+    private static string FormatPrice(uint? price) =>
+        price.HasValue
+            ? price.Value.ToString("N0", CultureInfo.InvariantCulture)
+            : "—";
+}

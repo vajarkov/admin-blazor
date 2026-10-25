@@ -86,20 +86,22 @@
             <div class="admin-nav-caption">ПРОГРАММЫ</div>
 
             <NavLink class="admin-nav-link"
-                    href="/programs"
-                    Match="NavLinkMatch.All"
-                    title="Все программы">
+                     href="/programs"
+                     Match="NavLinkMatch.All"
+                     title="Все программы">
                 <svg class="admin-nav-icon" viewBox="0 0 24 24"
-                    fill="none" stroke="currentColor"
-                    stroke-width="1.7" aria-hidden="true">
+                     fill="none" stroke="currentColor"
+                     stroke-width="1.7" aria-hidden="true">
                     <rect x="3" y="4" width="18" height="16" rx="2" />
                     <path d="M3 9h18M8 4v5M16 4v5M8 13h3M8 16h6" />
                 </svg>
                 <span class="admin-nav-text">Все программы</span>
             </NavLink>
 
-            <span class="admin-nav-link admin-nav-disabled"
-                  title="Расписание">
+            <NavLink class="admin-nav-link"
+                     href="/Schedules"
+                     Match="NavLinkMatch.All"
+                     title="Расписание">
                 <svg class="admin-nav-icon" viewBox="0 0 24 24"
                      fill="none" stroke="currentColor"
                      stroke-width="1.7" aria-hidden="true">
@@ -107,54 +109,61 @@
                     <path d="M12 7v5l3.5 2" />
                 </svg>
                 <span class="admin-nav-text">Расписание</span>
-            </span>
+            </NavLink>
 
             <NavLink class="admin-nav-link"
-                href="/groups"
-                Match="NavLinkMatch.All"
-                title="Группы">
-            <svg class="admin-nav-icon" viewBox="0 0 24 24"
-                fill="none" stroke="currentColor"
-                stroke-width="1.7" aria-hidden="true">
-                <rect x="3" y="4" width="8" height="7" rx="1.5" />
-                <rect x="13" y="4" width="8" height="7" rx="1.5" />
-                <rect x="3" y="13" width="8" height="7" rx="1.5" />
-                <rect x="13" y="13" width="8" height="7" rx="1.5" />
-                    </svg>
+                     href="/groups"
+                     Match="NavLinkMatch.All"
+                     title="Группы">
+                <svg class="admin-nav-icon" viewBox="0 0 24 24"
+                     fill="none" stroke="currentColor"
+                     stroke-width="1.7" aria-hidden="true">
+                    <rect x="3" y="4" width="8" height="7" rx="1.5" />
+                    <rect x="13" y="4" width="8" height="7" rx="1.5" />
+                    <rect x="3" y="13" width="8" height="7" rx="1.5" />
+                    <rect x="13" y="13" width="8" height="7" rx="1.5" />
+                </svg>
                 <span class="admin-nav-text">Группы</span>
             </NavLink>
         </div>
 
         <div class="admin-nav-group">
             <div class="admin-nav-caption">ПОДПИСКИ</div>
-
-            <span class="admin-nav-link admin-nav-disabled"
-                  title="Создать новую">
-                <svg class="admin-nav-icon" viewBox="0 0 24 24"
-                     fill="none" stroke="currentColor"
-                     stroke-width="1.7" aria-hidden="true">
-                    <rect x="3" y="5" width="18" height="14" rx="2" />
-                    <path d="M3 10h18M8 15h3" />
-                </svg>
-                <span class="admin-nav-text">Создать новую</span>
-            </span>
+                <NavLink class="admin-nav-link"
+                        href="/subscriptions"
+                        Match="NavLinkMatch.All"
+                        title="Создать новую">
+                    <svg class="admin-nav-icon"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.7"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        aria-hidden="true">
+                        <rect x="4" y="4" width="16" height="16" rx="2" />
+                        <path d="M12 8v8" />
+                        <path d="M8 12h8" />
+                    </svg>
+                    <span class="admin-nav-text">Создать новую</span>
+                </NavLink>
         </div>
 
         <div class="admin-nav-group">
             <div class="admin-nav-caption">ИГРЫ</div>
 
             <NavLink class="admin-nav-link"
-                href="/dictionary"
-                Match="NavLinkMatch.All"
-                title="Словарь">
+                     href="/dictionary"
+                     Match="NavLinkMatch.All"
+                     title="Словарь">
                 <svg class="admin-nav-icon"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="1.7"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    aria-hidden="true">
+                     viewBox="0 0 24 24"
+                     fill="none"
+                     stroke="currentColor"
+                     stroke-width="1.7"
+                     stroke-linecap="round"
+                     stroke-linejoin="round"
+                     aria-hidden="true">
                     <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v16H6.5A2.5 2.5 0 0 0 4 21.5z" />
                     <path d="M4 5.5v16" />
                     <path d="M8 7h8" />
@@ -162,7 +171,7 @@
                 </svg>
                 <span class="admin-nav-text">Словарь</span>
             </NavLink>
-            
+
             <span class="admin-nav-link admin-nav-disabled"
                   title="Наборщик">
                 <svg class="admin-nav-icon" viewBox="0 0 24 24"
@@ -199,16 +208,24 @@
         <div class="admin-nav-group">
             <div class="admin-nav-caption">ПЛАТФОРМА</div>
 
-            <span class="admin-nav-link admin-nav-disabled"
-                  title="Главный сайт">
-                <svg class="admin-nav-icon" viewBox="0 0 24 24"
-                     fill="none" stroke="currentColor"
-                     stroke-width="1.7" aria-hidden="true">
-                    <circle cx="12" cy="12" r="9" />
-                    <path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18" />
+            <NavLink class="admin-nav-link"
+                     href="/home-settings"
+                     Match="NavLinkMatch.All"
+                     title="Главный сайт">
+                <svg class="admin-nav-icon"
+                     viewBox="0 0 24 24"
+                     fill="none"
+                     stroke="currentColor"
+                     stroke-width="1.7"
+                     stroke-linecap="round"
+                     stroke-linejoin="round"
+                     aria-hidden="true">
+                    <path d="M3 10 12 3l9 7" />
+                    <path d="M5 9v12h14V9" />
+                    <path d="M9 21v-7h6v7" />
                 </svg>
                 <span class="admin-nav-text">Главный сайт</span>
-            </span>
+            </NavLink>
 
             <span class="admin-nav-link admin-nav-disabled"
                   title="Level-Гид">
@@ -220,26 +237,43 @@
                 <span class="admin-nav-text">Level-Гид</span>
             </span>
 
-            <span class="admin-nav-link admin-nav-disabled"
-                  title="Правила платформы">
-                <svg class="admin-nav-icon" viewBox="0 0 24 24"
-                     fill="none" stroke="currentColor"
-                     stroke-width="1.7" aria-hidden="true">
-                    <path d="M5 3h14v18H5zM8 7h8M8 11h8M8 15h5" />
+            <NavLink class="admin-nav-link"
+                     href="/rules"
+                     Match="NavLinkMatch.All"
+                     title="Правила платформы">
+                <svg class="admin-nav-icon"
+                     viewBox="0 0 24 24"
+                     fill="none"
+                     stroke="currentColor"
+                     stroke-width="1.7"
+                     stroke-linecap="round"
+                     stroke-linejoin="round"
+                     aria-hidden="true">
+                    <path d="M6 3.5h8l4 4V20a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4.5a1 1 0 0 1 1-1z" />
+                    <path d="M14 3.5V8h4" />
+                    <path d="M8 12h8" />
+                    <path d="M8 16h8" />
                 </svg>
                 <span class="admin-nav-text">Правила платформы</span>
-            </span>
+            </NavLink>
 
-            <span class="admin-nav-link admin-nav-disabled"
-                  title="Политика платформы">
-                <svg class="admin-nav-icon" viewBox="0 0 24 24"
-                     fill="none" stroke="currentColor"
-                     stroke-width="1.7" aria-hidden="true">
-                    <path d="M12 22s8-4 8-11V5l-8-3-8 3v6c0 7 8 11 8 11z" />
+            <NavLink class="admin-nav-link"
+                     href="/privacy-policy"
+                     Match="NavLinkMatch.All"
+                     title="Политика конфиденциальности">
+                <svg class="admin-nav-icon"
+                     viewBox="0 0 24 24"
+                     fill="none"
+                     stroke="currentColor"
+                     stroke-width="1.7"
+                     stroke-linecap="round"
+                     stroke-linejoin="round"
+                     aria-hidden="true">
+                    <path d="M12 3 20 6v5c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6l8-3z" />
                     <path d="m9 12 2 2 4-4" />
                 </svg>
-                <span class="admin-nav-text">Политика платформы</span>
-            </span>
+                <span class="admin-nav-text">Политика конфиденциальности</span>
+            </NavLink>
         </div>
     </nav>
 

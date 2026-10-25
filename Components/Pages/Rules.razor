@@ -1,0 +1,203 @@
+@page "/rules"
+@using admin_blazor.Models
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Components.Forms
+@inject admin_blazor.Data.AppDbContext Db
+@attribute [Authorize(Roles = "Admin")]
+
+<PageTitle>Правила платформы</PageTitle>
+
+<div class="container-fluid py-3">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3 class="mb-0">Правила платформы</h3>
+
+        @if (!isEditing && rule is not null)
+        {
+            <button class="btn btn-primary" @onclick="StartEditing">
+                Редактировать
+            </button>
+        }
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="text-muted">Загрузка правил...</div>
+    }
+    else if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <div class="alert alert-danger" role="alert">
+            @errorMessage
+        </div>
+        <button class="btn btn-outline-primary" @onclick="LoadRule">
+            Повторить
+        </button>
+    }
+    else if (isEditing)
+    {
+        <div class="card">
+            <div class="card-body">
+                <EditForm Model="editModel" OnValidSubmit="SaveRule">
+                    <div class="mb-3">
+                        <label for="rulesText" class="form-label">
+                            Текст правил (поддерживается HTML)
+                        </label>
+                        <InputTextArea id="rulesText"
+                                       class="form-control"
+                                       @bind-Value="editModel.Text"
+                                       rows="18" />
+                        <div class="form-text">
+                            HTML-разметка сохраняется как текст. В этом поле
+                            можно редактировать HTML-код правил.
+                        </div>
+                    </div>
+
+                    @if (!string.IsNullOrWhiteSpace(saveError))
+                    {
+                        <div class="alert alert-danger">@saveError</div>
+                    }
+
+                    <div class="d-flex gap-2">
+                        <button type="submit"
+                                class="btn btn-success"
+                                disabled="@isSaving">
+                            @(isSaving ? "Сохранение..." : "Сохранить")
+                        </button>
+
+                        <button type="button"
+                                class="btn btn-outline-secondary"
+                                @onclick="CancelEditing"
+                                disabled="@isSaving">
+                            Отмена
+                        </button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    }
+    else if (rule is null)
+    {
+        <div class="alert alert-warning">
+            Запись правил с ID = 1 не найдена в таблице rules.
+        </div>
+    }
+    else
+    {
+        <div class="card">
+            <div class="card-body">
+                @if (string.IsNullOrWhiteSpace(rule.Text))
+                {
+                    <p class="text-muted mb-0">Текст правил пуст.</p>
+                }
+                else
+                {
+                    @((MarkupString)rule.Text)
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private Rule? rule;
+    private RuleEditModel editModel = new();
+
+    private bool isLoading = true;
+    private bool isEditing;
+    private bool isSaving;
+
+    private string? errorMessage;
+    private string? saveError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadRule();
+    }
+
+    private async Task LoadRule()
+    {
+        isLoading = true;
+        errorMessage = null;
+        saveError = null;
+
+        try
+        {
+            rule = await Db.Rules
+                .AsNoTracking()
+                .FirstOrDefaultAsync(r => r.Id == 1);
+        }
+        catch (Exception)
+        {
+            errorMessage = "Не удалось загрузить правила. Проверь подключение к базе данных.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void StartEditing()
+    {
+        if (rule is null)
+            return;
+
+        editModel = new RuleEditModel
+        {
+            Text = rule.Text ?? string.Empty
+        };
+
+        saveError = null;
+        isEditing = true;
+    }
+
+    private void CancelEditing()
+    {
+        isEditing = false;
+        saveError = null;
+    }
+
+    private async Task SaveRule()
+    {
+        if (isSaving)
+            return;
+
+        isSaving = true;
+        saveError = null;
+
+        try
+        {
+            var existingRule = await Db.Rules
+                .FirstOrDefaultAsync(r => r.Id == 1);
+
+            if (existingRule is null)
+            {
+                saveError = "Запись правил с ID = 1 не найдена. Сохранение отменено.";
+                return;
+            }
+
+            existingRule.Text = editModel.Text;
+            await Db.SaveChangesAsync();
+
+            rule = new Rule
+            {
+                Id = existingRule.Id,
+                Text = existingRule.Text
+            };
+
+            isEditing = false;
+        }
+        catch (Exception)
+        {
+            saveError = "Не удалось сохранить правила. Проверь подключение к базе данных.";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private sealed class RuleEditModel
+    {
+        public string Text { get; set; } = string.Empty;
+    }
+}

@@ -1,0 +1,158 @@
+
+@page "/reviews/create"
+@using admin_blazor.Models
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Components.Forms
+@inject admin_blazor.Data.AppDbContext Db
+@attribute [Authorize(Roles = "Admin")]
+
+<PageTitle>Добавить отзыв</PageTitle>
+
+<div class="container-fluid py-3">
+    <nav aria-label="Навигация по странице" class="mb-3">
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item">
+                <a href="/">Главная</a>
+            </li>
+            <li class="breadcrumb-item">
+                <a href="/home-settings">Главный сайт</a>
+            </li>
+            <li class="breadcrumb-item active" aria-current="page">
+                Добавить отзыв
+            </li>
+        </ol>
+    </nav>
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+        <h3 class="mb-0">Добавить отзыв</h3>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">Отзыв студента</h5>
+        </div>
+
+        <EditForm Model="review" OnValidSubmit="SaveReview">
+            <DataAnnotationsValidator />
+
+            <div class="card-body">
+                <div class="mb-3">
+                    <label for="fname" class="form-label">Имя студента</label>
+                    <InputText id="fname"
+                               class="form-control"
+                               @bind-Value="review.Fname"
+                               maxlength="191" />
+                    <ValidationMessage For="@(() => review.Fname)" />
+                </div>
+
+                <div class="mb-3">
+                    <label for="lname" class="form-label">Фамилия студента</label>
+                    <InputText id="lname"
+                               class="form-control"
+                               @bind-Value="review.Lname"
+                               maxlength="191" />
+                    <ValidationMessage For="@(() => review.Lname)" />
+                </div>
+
+                <div class="mb-3">
+                    <label for="rtext" class="form-label">Отзыв студента</label>
+                    <InputTextArea id="rtext"
+                                   class="form-control"
+                                   @bind-Value="review.Rtext"
+                                   rows="6" />
+                    <ValidationMessage For="@(() => review.Rtext)" />
+                </div>
+
+                @if (!string.IsNullOrWhiteSpace(saveMessage))
+                {
+                    <div class="alert alert-success" role="alert">
+                        @saveMessage
+                    </div>
+                }
+
+                @if (!string.IsNullOrWhiteSpace(saveError))
+                {
+                    <div class="alert alert-danger" role="alert">
+                        @saveError
+                    </div>
+                }
+            </div>
+
+            <div class="card-footer d-flex flex-wrap gap-2">
+                <button type="submit" class="btn btn-primary" disabled="@isSaving">
+                    @(isSaving ? "Сохранение..." : "Сохранить")
+                </button>
+
+                <button type="button"
+                        class="btn btn-outline-secondary"
+                        @onclick="ResetForm"
+                        disabled="@isSaving">
+                    Очистить форму
+                </button>
+            </div>
+        </EditForm>
+    </div>
+</div>
+
+@code {
+    private Review review = new();
+    private bool isSaving;
+    private string? saveMessage;
+    private string? saveError;
+
+    private async Task SaveReview()
+    {
+        if (isSaving)
+            return;
+
+        saveMessage = null;
+        saveError = null;
+
+        if (string.IsNullOrWhiteSpace(review.Fname) ||
+            string.IsNullOrWhiteSpace(review.Lname) ||
+            string.IsNullOrWhiteSpace(review.Rtext))
+        {
+            saveError = "Заполни имя, фамилию и текст отзыва.";
+            return;
+        }
+
+        if (review.Fname.Length > 191 || review.Lname.Length > 191)
+        {
+            saveError = "Имя и фамилия не должны превышать 191 символ.";
+            return;
+        }
+
+        isSaving = true;
+
+        try
+        {
+            var newReview = new Review
+            {
+                Fname = review.Fname.Trim(),
+                Lname = review.Lname.Trim(),
+                Rtext = review.Rtext.Trim()
+            };
+
+            Db.Reviews.Add(newReview);
+            await Db.SaveChangesAsync();
+
+            review = new Review();
+            saveMessage = $"Отзыв успешно добавлен. ID записи: {newReview.Id}.";
+        }
+        catch (Exception)
+        {
+            saveError = "Не удалось сохранить отзыв. Проверь подключение к базе данных.";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private void ResetForm()
+    {
+        review = new Review();
+        saveMessage = null;
+        saveError = null;
+    }
+}

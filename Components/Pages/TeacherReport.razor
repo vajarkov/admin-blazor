@@ -1,0 +1,591 @@
+@page "/teacher-report"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin")]
+@using admin_blazor.Data
+@using admin_blazor.Models
+@using Microsoft.EntityFrameworkCore
+@using System.Globalization
+@inject AppDbContext Db
+
+<PageTitle>Отчёт преподавателя</PageTitle>
+
+<div class="container-fluid py-3">
+    <nav aria-label="Навигация по странице" class="mb-3">
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item"><a href="/">Главная</a></li>
+            <li class="breadcrumb-item"><a href="/schedules">Расписание</a></li>
+            <li class="breadcrumb-item active" aria-current="page">Отчёт преподавателя</li>
+        </ol>
+    </nav>
+
+    <h1 class="h3 mb-4">Отчёт преподавателя</h1>
+
+    @if (!string.IsNullOrWhiteSpace(loadError))
+    {
+        <div class="alert alert-danger" role="alert">@loadError</div>
+    }
+
+    <div class="card shadow-sm mb-4 report-controls">
+        <div class="card-body">
+            <div class="row g-3 align-items-end">
+                <div class="col-12 col-md-5">
+                    <label for="reportTeacher" class="form-label">Преподаватель</label>
+                    <select id="reportTeacher"
+                            class="form-select"
+                            @bind="selectedTeacherId">
+                        <option value="0">Выберите преподавателя</option>
+                        @foreach (var teacher in teachers)
+                        {
+                            <option value="@teacher.Id">@TeacherLabel(teacher)</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="col-6 col-md-3">
+                    <label for="reportMonth" class="form-label">Месяц</label>
+                    <select id="reportMonth" class="form-select" @bind="selectedMonth">
+                        @for (var m = 1; m <= 12; m++)
+                        {
+                            <option value="@m">@MonthName(m)</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="col-6 col-md-2">
+                    <label for="reportYear" class="form-label">Год</label>
+                    <select id="reportYear" class="form-select" @bind="selectedYear">
+                        @for (var y = DateTime.Today.Year - 5; y <= DateTime.Today.Year + 1; y++)
+                        {
+                            <option value="@y">@y</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="col-12 col-md-2">
+                    <button type="button"
+                            class="btn btn-primary w-100"
+                            disabled="@isLoading"
+                            @onclick="GenerateReportAsync">
+                        @(isLoading ? "Загрузка…" : "Сформировать")
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="text-muted py-3">Загрузка отчёта…</div>
+    }
+    else if (reportGenerated)
+    {
+        @if (reportTeacher is null)
+        {
+            <div class="alert alert-warning">Преподаватель не найден.</div>
+        }
+        else
+        {
+            <div class="report-content">
+                <div class="mb-3">
+                    <h2 class="h3 mb-1">@TeacherLabel(reportTeacher)</h2>
+                    <h3 class="h5 text-muted">
+                        Отчёт: @selectedMonth.ToString("00").@selectedYear
+                    </h3>
+                </div>
+
+                <hr />
+
+                <div class="row g-3 mb-3">
+                    <div class="col-12 col-md-6 col-lg-4">
+                        <div class="border rounded p-3 h-100">
+                            <div class="text-muted">Общее количество открытых слотов</div>
+                            <div class="fs-4 fw-bold">@report.Slots</div>
+                        </div>
+                    </div>
+                    <div class="col-12 col-md-6 col-lg-4">
+                        <div class="border rounded p-3 h-100">
+                            <div class="text-muted">Общее количество уроков</div>
+                            <div class="fs-4 fw-bold">@report.AllLessons</div>
+                        </div>
+                    </div>
+                    <div class="col-12 col-md-6 col-lg-4">
+                        <div class="border rounded p-3 h-100">
+                            <div class="text-muted">Групповые уроки (проведённые)</div>
+                            <div class="fs-4 fw-bold">@report.GroupLessons</div>
+                        </div>
+                    </div>
+                    <div class="col-12 col-md-6 col-lg-4">
+                        <div class="border rounded p-3 h-100">
+                            <div class="text-muted">Проведённые уроки</div>
+                            <div class="fs-4 fw-bold text-success">@report.CompletedLessons</div>
+                        </div>
+                    </div>
+                    <div class="col-12 col-md-6 col-lg-4">
+                        <div class="border rounded p-3 h-100">
+                            <div class="text-muted">Переработки (10:00–11:59)</div>
+                            <div class="fs-4 fw-bold">@report.Overtime</div>
+                        </div>
+                    </div>
+                    <div class="col-12 col-md-6 col-lg-4">
+                        <div class="border rounded p-3 h-100">
+                            <div class="text-muted">Отменённые уроки</div>
+                            <div class="fs-4 fw-bold text-danger">@report.CancelledLessons</div>
+                        </div>
+                    </div>
+                </div>
+
+                <hr />
+
+                <div class="row g-3 mb-4">
+                    <div class="col-12 col-md-4">
+                        Отменено администратором:
+                        <strong>@report.AdminCancel</strong>
+                    </div>
+                    <div class="col-12 col-md-4">
+                        Отменено преподавателем:
+                        <strong>@report.TeacherCancel</strong>
+                    </div>
+                    <div class="col-12 col-md-4">
+                        Отменено студентом:
+                        <strong>@report.StudentCancel</strong>
+                    </div>
+                </div>
+
+                <hr />
+
+                <h3 class="h5 mb-3">Список уроков</h3>
+
+                @if (report.Lessons.Count == 0)
+                {
+                    <div class="text-muted py-3">
+                        За выбранный месяц уроков не найдено.
+                    </div>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-hover align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th scope="col">#</th>
+                                    <th scope="col">Номер кабинета</th>
+                                    <th scope="col">Дата и время</th>
+                                    <th scope="col">Студент / группа</th>
+                                    <th scope="col">Курс</th>
+                                    <th scope="col">Время брони</th>
+                                    <th scope="col">Статус</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @for (var i = 0; i < report.Lessons.Count; i++)
+                                {
+                                    var lesson = report.Lessons[i];
+                                    <tr class="@StatusCss(lesson.Status)" @key="lesson.Id">
+                                        <th scope="row">@(i + 1)</th>
+                                        <td>@(lesson.Vendor ?? "—")</td>
+                                        <td>@lesson.LessonDate</td>
+                                        <td>@lesson.Student</td>
+                                        <td>@lesson.Course</td>
+                                        <td>@lesson.ReservationDate</td>
+                                        <td>@lesson.StatusText</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+
+                <div class="d-flex justify-content-end gap-2 mt-4 report-controls">
+                    <button type="button"
+                            class="btn btn-primary"
+                            onclick="window.print()">
+                        Печать
+                    </button>
+                    <a href="/schedules" class="btn btn-outline-primary">Назад к расписанию</a>
+                </div>
+            </div>
+        }
+    }
+</div>
+
+<style>
+    @@media print {
+        .report-controls,
+        nav,
+        .breadcrumb {
+            display: none !important;
+        }
+
+        body {
+            font-size: 10pt;
+        }
+
+        .container-fluid {
+            width: 100% !important;
+            max-width: none !important;
+            padding: 0 !important;
+        }
+
+        .border {
+            border-color: #999 !important;
+        }
+
+        .table {
+            font-size: 8pt;
+        }
+
+        .table-responsive {
+            overflow: visible !important;
+        }
+
+        .table tr {
+            break-inside: avoid;
+        }
+
+        .report-content {
+            color: #000 !important;
+        }
+    }
+</style>
+
+@code {
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "teacherId")]
+    public string? QueryTeacherId { get; set; }
+
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "month")]
+    public int? QueryMonth { get; set; }
+
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "year")]
+    public int? QueryYear { get; set; }
+
+    private static readonly CultureInfo RuCulture =
+        CultureInfo.GetCultureInfo("ru-RU");
+
+    private static readonly TimeZoneInfo AlmatyTimeZone =
+        TimeZoneInfo.FindSystemTimeZoneById("Asia/Almaty");
+
+    private List<Teacher> teachers = [];
+
+    private uint selectedTeacherId;
+    private int selectedMonth = DateTime.Today.Month;
+    private int selectedYear = DateTime.Today.Year;
+
+    private bool isLoading;
+    private bool reportGenerated;
+    private string? loadError;
+
+    private Teacher? reportTeacher;
+    private ReportData report = new();
+
+    private sealed class ReportData
+    {
+        public int Slots { get; set; }
+        public int AllLessons { get; set; }
+        public int GroupLessons { get; set; }
+        public int CompletedLessons { get; set; }
+        public int Overtime { get; set; }
+        public int CancelledLessons { get; set; }
+        public int TeacherCancel { get; set; }
+        public int AdminCancel { get; set; }
+        public int StudentCancel { get; set; }
+        public List<LessonRow> Lessons { get; set; } = [];
+    }
+
+    private sealed class LessonRow
+    {
+        public uint Id { get; init; }
+        public string? Vendor { get; init; }
+        public string LessonDate { get; init; } = "";
+        public string Student { get; init; } = "";
+        public string Course { get; init; } = "";
+        public string ReservationDate { get; init; } = "";
+        public uint? Status { get; init; }
+        public string StatusText { get; init; } = "";
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            teachers = await Db.Teachers
+                .AsNoTracking()
+                .OrderBy(t => t.Login)
+                .ToListAsync();
+
+            uint? queryTeacherId = null;
+
+            if (uint.TryParse(QueryTeacherId, out var parsedTeacherId)
+                && parsedTeacherId > 0)
+            {
+                queryTeacherId = parsedTeacherId;
+            }
+
+            if (queryTeacherId.HasValue)
+            {
+                selectedTeacherId = queryTeacherId.Value;
+            }
+
+            if (QueryMonth is >= 1 and <= 12)
+            {
+                selectedMonth = QueryMonth.Value;
+            }
+
+            if (QueryYear is >= 2000 and <= 9999)
+            {
+                selectedYear = QueryYear.Value;
+            }
+
+            if (queryTeacherId.HasValue
+                && teachers.Any(t => t.Id == queryTeacherId.Value))
+            {
+                await GenerateReportAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            loadError = $"Не удалось загрузить преподавателей: {ex.GetBaseException().Message}";
+        }
+    }
+
+    private async Task GenerateReportAsync()
+    {
+        loadError = null;
+        reportGenerated = false;
+
+        if (selectedTeacherId == 0)
+        {
+            loadError = "Выбери преподавателя.";
+            return;
+        }
+
+        if (selectedMonth is < 1 or > 12)
+        {
+            loadError = "Выбери корректный месяц.";
+            return;
+        }
+
+        if (selectedYear is < 2000 or > 9999)
+        {
+            loadError = "Выбери корректный год.";
+            return;
+        }
+
+        isLoading = true;
+
+        try
+        {
+            reportTeacher = teachers.FirstOrDefault(t => t.Id == selectedTeacherId);
+
+            if (reportTeacher is null)
+            {
+                reportTeacher = await Db.Teachers
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(t => t.Id == selectedTeacherId);
+            }
+
+            var reservations = await Db.Reservs
+                .AsNoTracking()
+                .Where(r => r.Teacher == selectedTeacherId)
+                .ToListAsync();
+
+            var schedules = await Db.Schedules
+                .AsNoTracking()
+                .Where(s => s.Teacher == selectedTeacherId)
+                .ToListAsync();
+
+            var relevantReservations = reservations
+                .Where(r => IsInSelectedMonth(r.Timecode))
+                .OrderBy(r => r.Timecode)
+                .ToList();
+
+            report = new ReportData
+            {
+                // В legacy-отчёте слоты считаются по месяцу Unix timestamp.
+                Slots = schedules.Count(s => IsInSelectedMonth(ParseTimestamp(s.Time))),
+                AllLessons = relevantReservations.Count,
+                GroupLessons = relevantReservations.Count(r => r.For == 2 && r.Status == 2),
+                CompletedLessons = relevantReservations.Count(r => r.Status == 2),
+                CancelledLessons = relevantReservations.Count(r => r.Status == 0),
+
+                // Эти три счётчика повторяют исходную логику PHP:
+                // они не фильтруются отдельно по status=0.
+                TeacherCancel = relevantReservations.Count(r => r.CanseledBy == "teacher"),
+                AdminCancel = relevantReservations.Count(r => r.CanseledBy == "admin"),
+                StudentCancel = relevantReservations.Count(r => r.CanseledBy == "student"),
+
+                // Проведённые уроки в часах 10 и 11.
+                Overtime = relevantReservations.Count(r =>
+                    r.Status == 2
+                    && GetAlmatyDateTime(r.Timecode)?.Hour is >= 10 and <= 11),
+
+                Lessons = await BuildLessonRowsAsync(relevantReservations)
+            };
+
+            reportGenerated = true;
+        }
+        catch (Exception ex)
+        {
+            loadError = $"Не удалось сформировать отчёт: {ex.GetBaseException().Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task<List<LessonRow>> BuildLessonRowsAsync(List<Reserv> reservations)
+    {
+        var studentIds = reservations
+            .Where(r => r.For == 1 && r.Student.HasValue)
+            .Select(r => r.Student!.Value)
+            .Distinct()
+            .ToList();
+
+        var groupVendors = reservations
+            .Where(r => r.For == 2 && r.Student.HasValue)
+            .Select(r => r.Student!.Value)
+            .Distinct()
+            .ToList();
+
+        var users = await Db.Users
+            .AsNoTracking()
+            .Where(u => studentIds.Contains(u.Id))
+            .ToListAsync();
+
+        var groups = await Db.Groups
+            .AsNoTracking()
+            .Where(g => g.Vendor.HasValue && groupVendors.Contains(g.Vendor.Value))
+            .ToListAsync();
+
+        var courseIds = reservations
+            .Select(r => uint.TryParse(r.Course, out var id) ? (uint?)id : null)
+            .Where(id => id.HasValue)
+            .Select(id => id!.Value)
+            .Distinct()
+            .ToList();
+
+        var courses = await Db.Courses
+            .AsNoTracking()
+            .Where(c => c.VId.HasValue && courseIds.Contains(c.VId.Value))
+            .ToListAsync();
+
+        var usersById = users.ToDictionary(u => u.Id);
+
+        var groupsByVendor = groups
+            .Where(g => g.Vendor.HasValue)
+            .GroupBy(g => g.Vendor!.Value)
+            .ToDictionary(g => g.Key, g => g.First());
+
+        var coursesById = courses
+            .Where(c => c.VId.HasValue)
+            .GroupBy(c => c.VId!.Value)
+            .ToDictionary(c => c.Key, c => c.First());
+
+        var rows = new List<LessonRow>(reservations.Count);
+
+        foreach (var reservation in reservations)
+        {
+            var studentLabel = "";
+
+            if (reservation.For == 1
+                && reservation.Student.HasValue
+                && usersById.TryGetValue(reservation.Student.Value, out var user))
+            {
+                studentLabel = string.Join(" ",
+                    new[] { user.Name, user.Surname }
+                        .Where(part => !string.IsNullOrWhiteSpace(part)));
+            }
+            else if (reservation.For == 2
+                     && reservation.Student.HasValue
+                     && groupsByVendor.TryGetValue(reservation.Student.Value, out var group))
+            {
+                studentLabel = $"{group.Name ?? ""}(group)";
+            }
+
+            var courseLabel = "";
+
+            if (uint.TryParse(reservation.Course, out var courseId)
+                && coursesById.TryGetValue(courseId, out var course))
+            {
+                courseLabel = course.Name ?? "";
+            }
+
+            rows.Add(new LessonRow
+            {
+                Id = reservation.Id,
+                Vendor = reservation.Vendor?.ToString("0.##", CultureInfo.InvariantCulture),
+                LessonDate = FormatTimestamp(reservation.Timecode),
+                Student = studentLabel,
+                Course = courseLabel,
+                ReservationDate = FormatTimestamp(reservation.ReservTime),
+                Status = reservation.Status,
+                StatusText = GetStatusText(reservation)
+            });
+        }
+
+        return rows;
+    }
+
+    private bool IsInSelectedMonth(long? timestamp)
+    {
+        var date = GetAlmatyDateTime(timestamp);
+
+        return date.HasValue
+            && date.Value.Year == selectedYear
+            && date.Value.Month == selectedMonth;
+    }
+
+    private static long? ParseTimestamp(string? value) =>
+        long.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var timestamp)
+            ? timestamp
+            : null;
+
+    private static DateTime? GetAlmatyDateTime(long? timestamp)
+    {
+        if (!timestamp.HasValue)
+        {
+            return null;
+        }
+
+        try
+        {
+            var utc = DateTimeOffset.FromUnixTimeSeconds(timestamp.Value).UtcDateTime;
+            return TimeZoneInfo.ConvertTimeFromUtc(utc, AlmatyTimeZone);
+        }
+        catch (ArgumentOutOfRangeException)
+        {
+            return null;
+        }
+    }
+
+    private static string FormatTimestamp(long? timestamp) =>
+        GetAlmatyDateTime(timestamp)?.ToString("dd.MM.yyyy HH:mm", RuCulture) ?? "—";
+
+    private static string StatusCss(uint? status) =>
+        status switch
+        {
+            0 => "table-danger",
+            1 => "table-warning",
+            2 => "table-success",
+            _ => ""
+        };
+
+    private static string GetStatusText(Reserv reserv) =>
+        reserv.Status switch
+        {
+            0 => $"Отменен({reserv.CanseledBy})",
+            1 => "В ожидании",
+            2 => "Проведен",
+            _ => string.Empty
+        };
+
+    private static string MonthName(int month) =>
+        RuCulture.DateTimeFormat.GetMonthName(month);
+
+    private static string TeacherLabel(Teacher teacher) =>
+        string.IsNullOrWhiteSpace(teacher.Login)
+            ? $"Преподаватель #{teacher.Id}"
+            : $"{teacher.Login} (ID {teacher.Id})";
+}
