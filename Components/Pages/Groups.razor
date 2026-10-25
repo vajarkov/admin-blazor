@@ -1,0 +1,826 @@
+@page "/groups"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin")]
+@using admin_blazor.Data
+@using admin_blazor.Models
+@using Microsoft.EntityFrameworkCore
+@using System.Globalization
+@inject AppDbContext Db
+
+<PageTitle>Группы</PageTitle>
+
+<div class="container-fluid py-3">
+    <nav aria-label="Навигация по странице" class="mb-3">
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item"><a href="/">Главная</a></li>
+            <li class="breadcrumb-item active" aria-current="page">Группы</li>
+        </ol>
+    </nav>
+
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+        <div>
+            <h1 class="h3 mb-1">Группы</h1>
+            <div class="text-muted">Всего групп: @groups.Count</div>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(loadError))
+    {
+        <div class="alert alert-danger" role="alert">@loadError</div>
+    }
+
+    @if (isLoading)
+    {
+        <div class="d-flex align-items-center gap-2 text-muted py-4">
+            <span class="spinner-border spinner-border-sm" role="status"
+                  aria-hidden="true"></span>
+            <span>Загрузка групп…</span>
+        </div>
+    }
+    else
+    {
+        @if (!string.IsNullOrWhiteSpace(successMessage))
+        {
+            <div class="alert alert-success" role="status">
+                @successMessage
+            </div>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(formError))
+        {
+            <div class="alert alert-danger" role="alert">
+                @formError
+            </div>
+        }
+
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-body">
+                <h2 class="h5 mb-0">Создать группу</h2>
+            </div>
+
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-12 col-lg-4">
+                        <label for="groupTitle" class="form-label">
+                            Название группы
+                        </label>
+                        <input id="groupTitle"
+                               class="form-control"
+                               maxlength="191"
+                               @bind="title"
+                               @bind:event="oninput" />
+                    </div>
+
+                    <div class="col-12 col-md-6 col-lg-4">
+                        <label for="groupTeacher" class="form-label">
+                            Преподаватель
+                        </label>
+                        <select id="groupTeacher"
+                                class="form-select"
+                                @bind="selectedTeacherId">
+                            <option value="0">Выберите преподавателя</option>
+                            @foreach (var teacher in teachers)
+                            {
+                                <option value="@teacher.Id">
+                                    @TeacherLabel(teacher)
+                                </option>
+                            }
+                        </select>
+                    </div>
+
+                    <div class="col-12 col-md-6 col-lg-4">
+                        <label for="groupTime" class="form-label">
+                            Время занятий
+                        </label>
+                        <input id="groupTime"
+                               type="time"
+                               class="form-control"
+                               @bind="timeOfDay" />
+                    </div>
+
+                    <div class="col-12 col-md-4">
+                        <label for="groupStart" class="form-label">
+                            Дата первого занятия
+                        </label>
+                        <input id="groupStart"
+                               type="date"
+                               class="form-control"
+                               @bind="startDate" />
+                    </div>
+
+                    <div class="col-6 col-md-4">
+                        <label for="groupCount" class="form-label">
+                            Количество занятий
+                        </label>
+                        <input id="groupCount"
+                               type="number"
+                               min="1"
+                               max="1000"
+                               class="form-control"
+                               @bind="lessonCount" />
+                    </div>
+
+                    <div class="col-6 col-md-4">
+                        <label for="groupPrice" class="form-label">
+                            Цена
+                        </label>
+                        <input id="groupPrice"
+                               type="number"
+                               min="0"
+                               class="form-control"
+                               @bind="price" />
+                    </div>
+
+                    <div class="col-12">
+                        <label class="form-label d-block">Дни недели</label>
+
+                        <div class="d-flex flex-wrap gap-3">
+                            @foreach (var day in WeekdayOptions)
+                            {
+                                <div class="form-check" @key="day.Number">
+                                    <input id="weekday-@day.Number"
+                                           class="form-check-input"
+                                           type="checkbox"
+                                           checked="@selectedWeekdays.Contains(day.Number)"
+                                           @onchange="args => ToggleWeekday(day.Number, args)" />
+
+                                    <label class="form-check-label"
+                                           for="weekday-@day.Number">
+                                        @day.Label
+                                    </label>
+                                </div>
+                            }
+                        </div>
+
+                        <div class="form-text">
+                            Нумерация совместима с PHP:
+                            1 — понедельник, 7 — воскресенье.
+                        </div>
+                    </div>
+                </div>
+
+                <hr class="my-4" />
+
+                <div class="d-flex flex-wrap justify-content-between
+                            align-items-end gap-3 mb-3">
+                    <div>
+                        <h3 class="h6 mb-1">Ученики</h3>
+                        <div class="text-muted small">
+                            Выбрано: @selectedStudentIds.Count
+                        </div>
+                    </div>
+
+                    <div class="d-flex flex-wrap gap-2">
+                        <button type="button"
+                                class="btn btn-sm btn-outline-secondary"
+                                @onclick="SelectFilteredStudents">
+                            Выбрать найденных
+                        </button>
+
+                        <button type="button"
+                                class="btn btn-sm btn-outline-secondary"
+                                @onclick="ClearStudentSelection">
+                            Очистить выбор
+                        </button>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label for="studentSearch" class="form-label">
+                        Поиск по ФИО, телефону или ID
+                    </label>
+                    <input id="studentSearch"
+                           class="form-control"
+                           type="search"
+                           placeholder="Введите ФИО, телефон или ID"
+                           @bind="studentSearch"
+                           @bind:event="oninput" />
+                </div>
+
+                <div class="table-responsive border rounded"
+                     style="max-height: 360px; overflow-y: auto;">
+                    <table class="table table-sm table-hover align-middle mb-0">
+                        <thead class="table-light position-sticky top-0">
+                            <tr>
+                                <th scope="col" style="width: 3rem;">Выбор</th>
+                                <th scope="col">ID</th>
+                                <th scope="col">ФИО</th>
+                                <th scope="col">Телефон</th>
+                                <th scope="col">Тип</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            @if (FilteredStudents.Count == 0)
+                            {
+                                <tr>
+                                    <td colspan="5"
+                                        class="text-center text-muted py-3">
+                                        Ученики не найдены
+                                    </td>
+                                </tr>
+                            }
+                            else
+                            {
+                                @foreach (var student in FilteredStudents)
+                                {
+                                    <tr @key="student.Id">
+                                        <td>
+                                            <input class="form-check-input"
+                                                   type="checkbox"
+                                                   aria-label="Выбрать ученика @student.Id"
+                                                   checked="@selectedStudentIds.Contains(student.Id)"
+                                                   @onchange="args => ToggleStudent(student.Id, args)" />
+                                        </td>
+                                        <td>@student.Id</td>
+                                        <td>@FullName(student)</td>
+                                        <td>@FormatPhone(student.Phone)</td>
+                                        <td>@StudentTypeLabel(student.StudentType)</td>
+                                    </tr>
+                                }
+                            }
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="d-flex flex-wrap justify-content-between
+                            align-items-center gap-3 mt-4">
+                    <div class="text-muted small">
+                        Будет создано занятий: @lessonCount
+                        при выбранных днях недели.
+                    </div>
+
+                    <button type="button"
+                            class="btn btn-primary"
+                            disabled="@isSaving"
+                            @onclick="CreateGroupAsync">
+                        @if (isSaving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2"
+                                  role="status"
+                                  aria-hidden="true"></span>
+                            <span>Создание…</span>
+                        }
+                        else
+                        {
+                            <span>Создать группу</span>
+                        }
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm">
+            <div class="card-header bg-body">
+                <h2 class="h5 mb-0">Существующие группы</h2>
+            </div>
+
+            <div class="card-body">
+                @if (groups.Count == 0)
+                {
+                    <div class="text-muted">Групп пока нет.</div>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-hover table-striped
+                                      align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Название</th>
+                                    <th>Преподаватель</th>
+                                    <th>Время</th>
+                                    <th>Дни</th>
+                                    <th>Занятий</th>
+                                    <th>Цена</th>
+                                    <th>Vendor</th>
+                                </tr>
+                            </thead>
+
+                            <tbody>
+                                @foreach (var group in groups)
+                                {
+                                    <tr @key="group.Id">
+                                        <td>@group.Id</td>
+                                        <td>
+                                            @(string.IsNullOrWhiteSpace(group.Name)
+                                                ? "—"
+                                                : group.Name)
+                                        </td>
+                                        <td>@TeacherLabelById(group.Teacher)</td>
+                                        <td>
+                                            @(string.IsNullOrWhiteSpace(group.Time)
+                                                ? "—"
+                                                : group.Time)
+                                        </td>
+                                        <td>@WeekdaysLabel(group.Weekdays)</td>
+                                        <td>@(group.Count?.ToString() ?? "—")</td>
+                                        <td>
+                                            @(group.Price?.ToString("N0",
+                                                CultureInfo.InvariantCulture) ?? "—")
+                                        </td>
+                                        <td>@(group.Vendor?.ToString() ?? "—")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private static readonly (int Number, string Label)[] WeekdayOptions =
+    [
+        (1, "Пн"),
+        (2, "Вт"),
+        (3, "Ср"),
+        (4, "Чт"),
+        (5, "Пт"),
+        (6, "Сб"),
+        (7, "Вс")
+    ];
+
+    private List<StudyGroup> groups = [];
+    private List<Teacher> teachers = [];
+    private List<User> students = [];
+
+    private readonly HashSet<int> selectedWeekdays = [];
+    private readonly HashSet<uint> selectedStudentIds = [];
+
+    private bool isLoading = true;
+    private bool isSaving;
+
+    private string? loadError;
+    private string? formError;
+    private string? successMessage;
+
+    private string title = string.Empty;
+    private uint selectedTeacherId;
+
+    // Исправлено: HTML input type="time" связывается с TimeOnly?.
+    private TimeOnly? timeOfDay;
+
+    // Исправлено: HTML input type="date" связывается с DateTime.
+    private DateTime startDate = DateTime.Today;
+
+    private int lessonCount = 1;
+    private int price;
+    private string studentSearch = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        isLoading = true;
+        loadError = null;
+
+        try
+        {
+            groups = await Db.Groups
+                .AsNoTracking()
+                .OrderByDescending(group => group.Id)
+                .ToListAsync();
+
+            teachers = await Db.Teachers
+                .AsNoTracking()
+                .OrderBy(teacher => teacher.Login)
+                .ToListAsync();
+
+            // Повторяем фильтр страницы /students.
+            students = await Db.Users
+                .AsNoTracking()
+                .Where(user => user.UserType != 3)
+                .OrderBy(user => user.Id)
+                .ToListAsync();
+        }
+        catch (Exception ex)
+        {
+            loadError =
+                $"Не удалось загрузить данные групп: {ex.GetBaseException().Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private List<User> FilteredStudents
+    {
+        get
+        {
+            var term = studentSearch.Trim();
+
+            if (string.IsNullOrWhiteSpace(term))
+                return students;
+
+            var digits = new string(term.Where(char.IsDigit).ToArray());
+
+            return students
+                .Where(student =>
+                    student.Id.ToString(CultureInfo.InvariantCulture)
+                        .Contains(term, StringComparison.OrdinalIgnoreCase)
+                    || FullName(student)
+                        .Contains(term, StringComparison.OrdinalIgnoreCase)
+                    || (!string.IsNullOrWhiteSpace(digits)
+                        && FormatPhone(student.Phone)
+                            .Contains(digits, StringComparison.OrdinalIgnoreCase)))
+                .ToList();
+        }
+    }
+
+    private void ToggleWeekday(int day, ChangeEventArgs args)
+    {
+        if (bool.TryParse(args.Value?.ToString(), out var isChecked)
+            && isChecked)
+        {
+            selectedWeekdays.Add(day);
+        }
+        else
+        {
+            selectedWeekdays.Remove(day);
+        }
+    }
+
+    private void ToggleStudent(uint studentId, ChangeEventArgs args)
+    {
+        if (bool.TryParse(args.Value?.ToString(), out var isChecked)
+            && isChecked)
+        {
+            selectedStudentIds.Add(studentId);
+        }
+        else
+        {
+            selectedStudentIds.Remove(studentId);
+        }
+    }
+
+    private void SelectFilteredStudents()
+    {
+        foreach (var student in FilteredStudents)
+            selectedStudentIds.Add(student.Id);
+    }
+
+    private void ClearStudentSelection()
+    {
+        selectedStudentIds.Clear();
+    }
+
+    private async Task CreateGroupAsync()
+    {
+        formError = null;
+        successMessage = null;
+
+        var normalizedTitle = title.Trim();
+
+        if (normalizedTitle.Length == 0)
+        {
+            formError = "Введите название группы.";
+            return;
+        }
+
+        if (normalizedTitle.Length > 191)
+        {
+            formError = "Название группы не должно превышать 191 символ.";
+            return;
+        }
+
+        if (selectedTeacherId == 0
+            || !teachers.Any(t => t.Id == selectedTeacherId))
+        {
+            formError = "Выберите существующего преподавателя.";
+            return;
+        }
+
+        if (!timeOfDay.HasValue)
+        {
+            formError = "Укажите корректное время занятий.";
+            return;
+        }
+
+        var parsedTime = timeOfDay.Value;
+        var parsedStartDate = startDate.Date;
+
+        if (lessonCount < 1 || lessonCount > 1000)
+        {
+            formError = "Количество занятий должно быть от 1 до 1000.";
+            return;
+        }
+
+        if (price < 0)
+        {
+            formError = "Цена не может быть отрицательной.";
+            return;
+        }
+
+        if (selectedWeekdays.Count == 0)
+        {
+            formError = "Выберите хотя бы один день недели.";
+            return;
+        }
+
+        if (selectedStudentIds.Count == 0)
+        {
+            formError = "Выберите хотя бы одного ученика.";
+            return;
+        }
+
+        var matchingDates = new List<DateTime>(lessonCount);
+        var currentDate = parsedStartDate;
+
+        while (matchingDates.Count < lessonCount)
+        {
+            var isoDay = ((int)currentDate.DayOfWeek + 6) % 7 + 1;
+
+            if (selectedWeekdays.Contains(isoDay))
+                matchingDates.Add(currentDate);
+
+            currentDate = currentDate.AddDays(1);
+        }
+
+        var lessons = new List<(string DateText, uint Timestamp)>(
+            matchingDates.Count);
+
+        foreach (var date in matchingDates)
+        {
+            var localDateTime = DateTime.SpecifyKind(
+                date.Add(parsedTime.ToTimeSpan()),
+                DateTimeKind.Local);
+
+            var unixSeconds =
+                new DateTimeOffset(localDateTime).ToUnixTimeSeconds();
+
+            if (unixSeconds < 0 || unixSeconds > uint.MaxValue)
+            {
+                formError =
+                    "Дата занятия выходит за допустимый диапазон времени старой базы.";
+                return;
+            }
+
+            lessons.Add((
+                date.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture),
+                (uint)unixSeconds));
+        }
+
+        isSaving = true;
+
+        try
+        {
+            // Serializable снижает риск параллельного назначения vendor.
+            await using var transaction =
+                await Db.Database.BeginTransactionAsync(
+                    System.Data.IsolationLevel.Serializable);
+
+            var existingGroupVendors = await Db.Groups
+                .AsNoTracking()
+                .Where(group => group.Vendor.HasValue)
+                .Select(group => group.Vendor!.Value)
+                .ToListAsync();
+
+            var existingMemberGroupIds = await Db.GroupMembers
+                .AsNoTracking()
+                .Where(member => member.GroupId.HasValue)
+                .Select(member => member.GroupId!.Value)
+                .ToListAsync();
+
+            var reservationStudentIds = await Db.Reservs
+                .AsNoTracking()
+                .Where(reservation => reservation.Student.HasValue)
+                .Select(reservation => reservation.Student!.Value)
+                .ToListAsync();
+
+            var maxExistingVendor = existingGroupVendors
+                .Concat(existingMemberGroupIds)
+                .Concat(reservationStudentIds.Where(id => id >= 200000))
+                .DefaultIfEmpty(200000u)
+                .Max();
+
+            var reservationCount = await Db.Reservs.CountAsync();
+
+            var nextByLegacyRule = 200000L + reservationCount + 1L;
+            var nextByExistingData = (long)maxExistingVendor + 1L;
+
+            var vendorValue = Math.Max(
+                nextByLegacyRule,
+                nextByExistingData);
+
+            if (vendorValue > uint.MaxValue)
+            {
+                throw new InvalidOperationException(
+                    "Не удалось подобрать допустимый идентификатор группы.");
+            }
+
+            var groupVendor = (uint)vendorValue;
+
+            var nowLong = DateTimeOffset.Now.ToUnixTimeSeconds();
+
+            if (nowLong < 0 || nowLong > uint.MaxValue)
+            {
+                throw new InvalidOperationException(
+                    "Текущее время выходит за диапазон старой базы.");
+            }
+
+            var now = (uint)nowLong;
+
+            var studentsToUpdate = await Db.Users
+                .Where(user => selectedStudentIds.Contains(user.Id))
+                .ToListAsync();
+
+            if (studentsToUpdate.Count != selectedStudentIds.Count)
+            {
+                throw new InvalidOperationException(
+                    "Некоторые выбранные ученики уже отсутствуют в базе. Обновите страницу.");
+            }
+
+            if (studentsToUpdate.Any(student => student.UserType == 3))
+            {
+                throw new InvalidOperationException(
+                    "В выборе есть пользователь, который не может быть назначен учеником.");
+            }
+
+            var group = new StudyGroup
+            {
+                Vendor = groupVendor,
+                Name = normalizedTitle,
+                Teacher = selectedTeacherId,
+                Time = parsedTime.ToString(
+                    "HH:mm",
+                    CultureInfo.InvariantCulture),
+                Count = (uint)lessonCount,
+                Price = (uint)price,
+                CreateTime = now,
+                Weekdays = string.Join(
+                    ",",
+                    selectedWeekdays.OrderBy(day => day))
+            };
+
+            Db.Groups.Add(group);
+
+            var usedReservationVendors = new HashSet<int>();
+
+            foreach (var lesson in lessons)
+            {
+                int reservationVendor;
+
+                do
+                {
+                    reservationVendor = Random.Shared.Next(11111, 100000);
+                }
+                while (
+                    usedReservationVendors.Contains(reservationVendor)
+                    || await Db.Schedules.AnyAsync(
+                        schedule => schedule.Reserv == reservationVendor)
+                    || await Db.Reservs.AnyAsync(
+                        reservation => reservation.Vendor == reservationVendor));
+
+                usedReservationVendors.Add(reservationVendor);
+
+                // Совместимость со старым PHP:
+                // заполняется schedules.teacher, а не teacher_id.
+                Db.Schedules.Add(new Schedule
+                {
+                    Teacher = selectedTeacherId,
+                    Date = lesson.DateText,
+                    Time = lesson.Timestamp.ToString(
+                        CultureInfo.InvariantCulture),
+                    CreateTime = now,
+                    Reserv = reservationVendor
+                });
+
+                Db.Reservs.Add(new Reserv
+                {
+                    Vendor = reservationVendor,
+                    Student = groupVendor,
+                    Teacher = selectedTeacherId,
+                    Course = "000",
+                    Status = 1,
+                    For = 2,
+                    Timecode = lesson.Timestamp,
+                    ReservTime = now
+                });
+            }
+
+            foreach (var student in studentsToUpdate)
+            {
+                Db.GroupMembers.Add(new GroupMember
+                {
+                    GroupId = groupVendor,
+                    Student = student.Id,
+                    DateTime = now
+                });
+
+                student.StudentType = 2;
+            }
+
+            await Db.SaveChangesAsync();
+            await transaction.CommitAsync();
+
+            successMessage =
+                $"Группа «{normalizedTitle}» создана. " +
+                $"Занятий: {lessons.Count}, " +
+                $"учеников: {studentsToUpdate.Count}, " +
+                $"vendor: {groupVendor}.";
+
+            ResetForm();
+            await LoadDataAsync();
+        }
+        catch (Exception ex)
+        {
+            Db.ChangeTracker.Clear();
+
+            formError =
+                $"Не удалось создать группу: {ex.GetBaseException().Message}";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private void ResetForm()
+    {
+        title = string.Empty;
+        selectedTeacherId = 0;
+        timeOfDay = null;
+        startDate = DateTime.Today;
+        lessonCount = 1;
+        price = 0;
+
+        selectedWeekdays.Clear();
+        selectedStudentIds.Clear();
+
+        studentSearch = string.Empty;
+    }
+
+    private string TeacherLabelById(uint? teacherId)
+    {
+        if (teacherId is null)
+            return "—";
+
+        var teacher = teachers.FirstOrDefault(
+            item => item.Id == teacherId.Value);
+
+        return teacher is null
+            ? $"ID {teacherId.Value}"
+            : TeacherLabel(teacher);
+    }
+
+    private static string TeacherLabel(Teacher teacher) =>
+        string.IsNullOrWhiteSpace(teacher.Login)
+            ? $"Преподаватель #{teacher.Id}"
+            : $"{teacher.Login} (ID {teacher.Id})";
+
+    private static string FullName(User student)
+    {
+        var name = string.Join(
+            " ",
+            new[] { student.Name, student.Surname }
+                .Where(part => !string.IsNullOrWhiteSpace(part)));
+
+        return string.IsNullOrWhiteSpace(name) ? "—" : name;
+    }
+
+    private static string FormatPhone(double? phone) =>
+        phone.HasValue
+            ? phone.Value.ToString("0", CultureInfo.InvariantCulture)
+            : "—";
+
+    private static string StudentTypeLabel(uint? studentType) =>
+        studentType == 1
+            ? "Индивидуальный"
+            : studentType == 2
+                ? "Групповой"
+                : "Не указан";
+
+    private static string WeekdaysLabel(string? weekdays)
+    {
+        if (string.IsNullOrWhiteSpace(weekdays))
+            return "—";
+
+        var labels = new Dictionary<int, string>
+        {
+            [1] = "Пн",
+            [2] = "Вт",
+            [3] = "Ср",
+            [4] = "Чт",
+            [5] = "Пт",
+            [6] = "Сб",
+            [7] = "Вс"
+        };
+
+        return string.Join(
+            ", ",
+            weekdays.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                .Select(value =>
+                    int.TryParse(value, out var day)
+                    && labels.TryGetValue(day, out var label)
+                        ? label
+                        : null)
+                .Where(label => label is not null));
+    }
+}
