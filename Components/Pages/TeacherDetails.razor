@@ -10,7 +10,7 @@
 @using System.IO
 
 @inject AppDbContext Db
-@inject IWebHostEnvironment Environment
+@inject IConfiguration Configuration
 
 <PageTitle>Преподаватель</PageTitle>
 
@@ -284,12 +284,22 @@
         }
     }
 
-    private string AvatarDirectory =>
-        Path.Combine(
-            Environment.WebRootPath ?? Path.Combine(Environment.ContentRootPath, "wwwroot"),
-            "images",
-            "user",
-            "teacher");
+    private string AvatarDirectory
+    {
+        get
+        {
+            var userImagesDirectory =
+                Configuration["Storage:UserImagesDirectory"];
+
+            if (string.IsNullOrWhiteSpace(userImagesDirectory))
+            {
+                throw new InvalidOperationException(
+                    "Не настроен каталог Storage:UserImagesDirectory.");
+            }
+
+            return Path.Combine(userImagesDirectory, "teacher");
+        }
+    }
 
     protected override async Task OnInitializedAsync()
     {

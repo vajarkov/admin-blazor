@@ -1,11 +1,14 @@
 using System.Security.Claims;
+using System.Net;
 using admin_blazor.Components;
 using admin_blazor.Data;
 using admin_blazor.Services;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.FileProviders;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -13,6 +16,29 @@ var connectionString =
     builder.Configuration.GetConnectionString("LevelEnglish")
     ?? throw new InvalidOperationException(
         "Connection string 'LevelEnglish' is not configured.");
+
+// Постоянный каталог изображений.
+// В production можно переопределить через Storage__UserImagesDirectory.
+var userImagesDirectory =
+    builder.Configuration["Storage:UserImagesDirectory"];
+
+if (string.IsNullOrWhiteSpace(userImagesDirectory))
+{
+    userImagesDirectory = builder.Environment.IsDevelopment()
+        ? Path.Combine(
+            builder.Environment.ContentRootPath,
+            "wwwroot",
+            "images",
+            "user")
+        : "/var/lib/level-english-admin/images/user";
+}
+
+userImagesDirectory = Path.GetFullPath(userImagesDirectory);
+
+builder.Configuration["Storage:UserImagesDirectory"] =
+    userImagesDirectory;
+
+Directory.CreateDirectory(userImagesDirectory);
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseMySql(
@@ -24,6 +50,19 @@ builder.Services.AddRazorComponents()
 
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<AuthService>();
+
+// Доверяем forwarded-заголовкам только от локального Apache.
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders =
+        ForwardedHeaders.XForwardedFor |
+        ForwardedHeaders.XForwardedProto;
+
+    options.KnownProxies.Clear();
+    options.KnownNetworks.Clear();
+    options.KnownProxies.Add(IPAddress.Loopback);
+    options.ForwardLimit = 1;
+});
 
 builder.Services
     .AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
@@ -46,11 +85,26 @@ builder.Services.AddCascadingAuthenticationState();
 
 var app = builder.Build();
 
+// Обрабатываем заголовки прокси до HTTPS-редиректов и аутентификации.
+app.UseForwardedHeaders();
+
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
     app.UseHsts();
 }
+
+// Обычные статические файлы приложения.
+app.UseStaticFiles();
+
+// Постоянные изображения доступны по прежним URL:
+// /images/user/{filename}
+// /images/user/teacher/{filename}
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(userImagesDirectory),
+    RequestPath = "/images/user"
+});
 
 app.UseHttpsRedirection();
 app.UseAuthentication();
@@ -127,7 +181,6 @@ app.MapPost("/auth/login", async (
     return Results.Redirect("/");
 });
 
-
 app.MapPost("/auth/logout", async (
     HttpContext context,
     IAntiforgery antiforgery) =>
@@ -147,7 +200,6 @@ app.MapPost("/auth/logout", async (
 
     return Results.Redirect("/login");
 });
-
 
 app.MapStaticAssets();
 

@@ -9,7 +9,7 @@
 @using System.Globalization
 
 @inject AppDbContext Db
-@inject IWebHostEnvironment Environment
+@inject IConfiguration Configuration
 @inject NavigationManager NavigationManager
 
 <PageTitle>Добавить преподавателя</PageTitle>
@@ -370,19 +370,17 @@
 
             if (selectedAvatar is not null)
             {
-                var webRoot = Environment.WebRootPath;
+                var userImagesDirectory =
+                    Configuration["Storage:UserImagesDirectory"];
 
-                if (string.IsNullOrWhiteSpace(webRoot))
+                if (string.IsNullOrWhiteSpace(userImagesDirectory))
                 {
-                    webRoot = Path.Combine(
-                        Environment.ContentRootPath,
-                        "wwwroot");
+                    throw new InvalidOperationException(
+                        "Не настроен каталог Storage:UserImagesDirectory.");
                 }
 
                 var avatarDirectory = Path.Combine(
-                    webRoot,
-                    "images",
-                    "user",
+                    userImagesDirectory,
                     "teacher");
 
                 Directory.CreateDirectory(avatarDirectory);
