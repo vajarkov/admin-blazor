@@ -1,0 +1,411 @@
+
+@page "/nabor"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin")]
+
+@using admin_blazor.Data
+@using admin_blazor.Models
+@using Microsoft.EntityFrameworkCore
+
+@inject AppDbContext Db
+
+<PageTitle>Наборщик</PageTitle>
+
+<div class="container-fluid py-3">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="mb-1">Наборщик</h2>
+            <div class="text-muted">Настройки игры и наборы слов</div>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <div class="alert alert-danger" role="alert">
+            @errorMessage
+        </div>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(successMessage))
+    {
+        <div class="alert alert-success" role="alert">
+            @successMessage
+        </div>
+    }
+
+    @if (isLoading)
+    {
+        <p>Загрузка данных...</p>
+    }
+    else
+    {
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Настройки игры</h5>
+            </div>
+
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label for="waitTime" class="form-label">
+                            Время ожидания
+                        </label>
+
+                        <InputNumber id="waitTime"
+                                     class="form-control"
+                                     @bind-Value="waitTime"
+                                     min="0" />
+                    </div>
+
+                    <div class="col-md-4">
+                        <label for="gameTime" class="form-label">
+                            Время игры
+                        </label>
+
+                        <InputNumber id="gameTime"
+                                     class="form-control"
+                                     @bind-Value="gameTime"
+                                     min="0" />
+                    </div>
+                </div>
+
+                <div class="mt-3">
+                    <button type="button"
+                            class="btn btn-primary"
+                            disabled="@isSaving"
+                            @onclick="SaveSettingsAsync">
+                        @(isSaving ? "Сохранение..." : "Сохранить настройки")
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Добавить набор</h5>
+            </div>
+
+            <div class="card-body">
+                <div class="row g-3 align-items-end">
+                    <div class="col-md-6">
+                        <label for="newWord" class="form-label">
+                            Название набора
+                        </label>
+
+                        <input id="newWord"
+                               class="form-control"
+                               maxlength="191"
+                               @bind="newWord"
+                               @bind:event="oninput"
+                               placeholder="Введите слово или название набора" />
+                    </div>
+
+                    <div class="col-md-auto">
+                        <button type="button"
+                                class="btn btn-primary"
+                                disabled="@isSaving"
+                                @onclick="AddNaborAsync">
+                            Добавить
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Все наборы</h5>
+            </div>
+
+            <div class="card-body">
+                @if (nabors.Count == 0)
+                {
+                    <p class="text-muted mb-0">Наборы пока не добавлены.</p>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Набор</th>
+                                    <th>Количество слов</th>
+                                    <th>Действия</th>
+                                </tr>
+                            </thead>
+
+                            <tbody>
+                                @foreach (var item in nabors)
+                                {
+                                    <tr @key="item.Id">
+                                        <td>@item.Id</td>
+                                        <td>@item.Word</td>
+                                        <td>
+                                            @GetWordCount(item.Id)
+                                        </td>
+                                        <td>
+                                            <div class="d-flex flex-wrap gap-2">
+                                                <a class="btn btn-sm btn-outline-primary"
+                                                   href="@($"/nabor/words/{item.Id}")">
+                                                    Слова и переводы
+                                                </a>
+
+                                                @if (pendingDeleteId == item.Id)
+                                                {
+                                                    <span class="text-danger align-self-center">
+                                                        Удалить набор?
+                                                    </span>
+
+                                                    <button class="btn btn-sm btn-danger"
+                                                            disabled="@isSaving"
+                                                            @onclick="() => DeleteNaborAsync(item.Id)">
+                                                        Подтвердить
+                                                    </button>
+
+                                                    <button class="btn btn-sm btn-outline-secondary"
+                                                            @onclick="CancelDelete">
+                                                        Отмена
+                                                    </button>
+                                                }
+                                                else
+                                                {
+                                                    <button class="btn btn-sm btn-outline-danger"
+                                                            @onclick="() => AskDelete(item.Id)">
+                                                        Удалить
+                                                    </button>
+                                                }
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private List<NaborItem> nabors = new();
+    private Dictionary<uint, int> wordCounts = new();
+
+    private int? waitTime;
+    private int? gameTime;
+    private string newWord = string.Empty;
+
+    private uint? pendingDeleteId;
+
+    private bool isLoading = true;
+    private bool isSaving;
+
+    private string? errorMessage;
+    private string? successMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        isLoading = true;
+        errorMessage = null;
+
+        try
+        {
+            var setting = await Db.NaborshikSettings
+                .OrderBy(x => x.Id)
+                .FirstOrDefaultAsync();
+
+            waitTime = ToInt(setting?.Waittime);
+            gameTime = ToInt(setting?.Gametime);
+
+            nabors = await Db.Nabors
+                .AsNoTracking()
+                .OrderBy(x => x.Id)
+                .ToListAsync();
+
+            var linkedWords = await Db.NaborshikWords
+                .AsNoTracking()
+                .Where(x => x.Wordid != null)
+                .ToListAsync();
+
+            wordCounts = linkedWords
+                .Where(x => x.Wordid.HasValue)
+                .GroupBy(x => (uint)x.Wordid!.Value)
+                .ToDictionary(g => g.Key, g => g.Count());
+        }
+        catch (Exception)
+        {
+            errorMessage = "Не удалось загрузить данные. Проверь подключение к базе данных и сопоставление таблиц.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private static int? ToInt(uint? value)
+    {
+        if (!value.HasValue || value.Value > int.MaxValue)
+        {
+            return null;
+        }
+
+        return (int)value.Value;
+    }
+
+    private int GetWordCount(uint naborId)
+    {
+        return wordCounts.TryGetValue(naborId, out var count)
+            ? count
+            : 0;
+    }
+
+    private async Task SaveSettingsAsync()
+    {
+        errorMessage = null;
+        successMessage = null;
+
+        if (waitTime is null or < 0 || gameTime is null or < 0)
+        {
+            errorMessage = "Укажи неотрицательные значения времени для обоих полей.";
+            return;
+        }
+
+        isSaving = true;
+
+        try
+        {
+            var setting = await Db.NaborshikSettings
+                .OrderBy(x => x.Id)
+                .FirstOrDefaultAsync();
+
+            if (setting is null)
+            {
+                setting = new NaborshikSetting();
+                Db.NaborshikSettings.Add(setting);
+            }
+
+            setting.Waittime = (uint)waitTime.Value;
+            setting.Gametime = (uint)gameTime.Value;
+
+            await Db.SaveChangesAsync();
+
+            successMessage = "Настройки игры сохранены.";
+        }
+        catch (Exception)
+        {
+            errorMessage = "Не удалось сохранить настройки игры.";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task AddNaborAsync()
+    {
+        errorMessage = null;
+        successMessage = null;
+
+        var value = newWord.Trim();
+
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            errorMessage = "Введи название набора.";
+            return;
+        }
+
+        isSaving = true;
+
+        try
+        {
+            Db.Nabors.Add(new NaborItem
+            {
+                Word = value
+            });
+
+            await Db.SaveChangesAsync();
+
+            newWord = string.Empty;
+            successMessage = "Набор добавлен.";
+
+            await LoadDataAsync();
+        }
+        catch (Exception)
+        {
+            errorMessage = "Не удалось добавить набор.";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private void AskDelete(uint id)
+    {
+        pendingDeleteId = id;
+        errorMessage = null;
+        successMessage = null;
+    }
+
+    private void CancelDelete()
+    {
+        pendingDeleteId = null;
+    }
+
+    private async Task DeleteNaborAsync(uint id)
+    {
+        if (pendingDeleteId != id)
+        {
+            return;
+        }
+
+        errorMessage = null;
+        successMessage = null;
+        isSaving = true;
+
+        try
+        {
+            var nabor = await Db.Nabors
+                .FirstOrDefaultAsync(x => x.Id == id);
+
+            if (nabor is null)
+            {
+                errorMessage = "Набор уже не существует.";
+                return;
+            }
+
+            // В таблице naborshikwords поле wordid имеет тип tinyint unsigned.
+            // Поэтому связанные записи могут ссылаться только на ID до 255.
+            if (id <= byte.MaxValue)
+            {
+                var linkedWords = await Db.NaborshikWords
+                    .Where(x => x.Wordid == (byte)id)
+                    .ToListAsync();
+
+                Db.NaborshikWords.RemoveRange(linkedWords);
+            }
+
+            Db.Nabors.Remove(nabor);
+
+            await Db.SaveChangesAsync();
+
+            pendingDeleteId = null;
+            successMessage = "Набор и связанные с ним переводы удалены.";
+
+            await LoadDataAsync();
+        }
+        catch (Exception)
+        {
+            errorMessage = "Не удалось удалить набор. Проверь данные и подключение к базе.";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+}

@@ -7,7 +7,7 @@ namespace admin_blazor.Data;
 public class AppDbContext(DbContextOptions<AppDbContext> options)
     : DbContext(options)
 {
-    
+
     public DbSet<Rule> Rules => Set<Rule>();
     public DbSet<User> Users => Set<User>();
     public DbSet<Config> Configs => Set<Config>();
@@ -23,6 +23,13 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<HomeSetting> HomeSettings => Set<HomeSetting>();
     public DbSet<Review> Reviews => Set<Review>();
     public DbSet<Subscription> Subscriptions => Set<Subscription>();
+    public DbSet<NaborshikSetting> NaborshikSettings => Set<NaborshikSetting>();
+    public DbSet<NaborItem> Nabors => Set<NaborItem>();
+    public DbSet<NaborshikWord> NaborshikWords => Set<NaborshikWord>();
+    public DbSet<Poliglot> Poliglots => Set<Poliglot>();
+    public DbSet<Teory> Teorys => Set<Teory>();
+    public DbSet<Quiz> Quizzes => Set<Quiz>();
+    public DbSet<QuizQuestion> QuizQuestions => Set<QuizQuestion>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -295,7 +302,158 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
 
             entity.Property(e => e.Pages)
                 .HasColumnName("pages");
-});
+        });
+        modelBuilder.Entity<NaborshikSetting>(entity =>
+        {
+            entity.ToTable("naborshik");
+
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Id)
+                .HasColumnName("id")
+                .ValueGeneratedOnAdd();
+
+            entity.Property(e => e.Waittime)
+                .HasColumnName("waittime");
+
+            entity.Property(e => e.Gametime)
+                .HasColumnName("gametime");
+        });
+
+        modelBuilder.Entity<NaborItem>(entity =>
+        {
+            entity.ToTable("nabor");
+
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Id)
+                .HasColumnName("id")
+                .ValueGeneratedOnAdd();
+
+            entity.Property(e => e.Word)
+                .HasColumnName("word")
+                .HasMaxLength(191);
+        });
+
+        modelBuilder.Entity<NaborshikWord>(entity =>
+        {
+            entity.ToTable("naborshikwords");
+
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Id)
+                .HasColumnName("id")
+                .ValueGeneratedOnAdd();
+
+            entity.Property(e => e.En)
+                .HasColumnName("en")
+                .HasMaxLength(191);
+
+            entity.Property(e => e.Rus)
+                .HasColumnName("rus")
+                .HasMaxLength(191);
+
+            entity.Property(e => e.Wordid)
+                .HasColumnName("wordid");
+        });
+
+        modelBuilder.Entity<Poliglot>(entity =>
+        {
+            entity.ToTable("poliglot");
+
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Id)
+                .HasColumnName("id")
+                .ValueGeneratedOnAdd();
+
+            entity.Property(e => e.Number)
+                .HasColumnName("number");
+
+            entity.Property(e => e.Name)
+                .HasColumnName("name")
+                .HasMaxLength(191);
+
+            entity.Property(e => e.RequiredScore)
+                .HasColumnName("required_score");
+
+            entity.Property(e => e.MaxScore)
+                .HasColumnName("max_score")
+                .HasMaxLength(191);
+        });
+
+        modelBuilder.Entity<Teory>(entity =>
+        {
+            entity.ToTable("teorys");
+
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Id)
+                .HasColumnName("id")
+                .ValueGeneratedOnAdd();
+
+            entity.Property(e => e.LessonId)
+                .HasColumnName("lesson_id");
+
+            entity.Property(e => e.Content)
+                .HasColumnName("content")
+                .HasColumnType("text");
+        });
+
+        modelBuilder.Entity<Quiz>(entity =>
+        {
+            entity.ToTable("quiz");
+
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Id)
+                .HasColumnName("id")
+                .ValueGeneratedOnAdd();
+
+            entity.Property(e => e.Vendor)
+                .HasColumnName("vendor");
+
+            entity.Property(e => e.Name)
+                .HasColumnName("name")
+                .HasMaxLength(191);
+
+            entity.Property(e => e.Description)
+                .HasColumnName("desc")
+                .HasColumnType("text");
+        });
+
+        modelBuilder.Entity<QuizQuestion>(entity =>
+        {
+            entity.ToTable("quizes");
+
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Id)
+                .HasColumnName("id")
+                .ValueGeneratedOnAdd();
+
+            entity.Property(e => e.QuizId)
+                .HasColumnName("quizid");
+
+            entity.Property(e => e.Question)
+                .HasColumnName("question")
+                .HasMaxLength(191);
+
+            entity.Property(e => e.Answer1)
+                .HasColumnName("answer1")
+                .HasMaxLength(191);
+
+            entity.Property(e => e.Answer2)
+                .HasColumnName("answer2")
+                .HasMaxLength(191);
+
+            entity.Property(e => e.Answer3)
+                .HasColumnName("answer3")
+                .HasMaxLength(191);
+
+            entity.Property(e => e.CorrectAnswer)
+                .HasColumnName("correct_answer");
+        });
 
     }
 }

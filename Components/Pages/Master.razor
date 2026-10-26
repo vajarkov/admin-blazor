@@ -1,0 +1,312 @@
+@page "/master"
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.JSInterop
+@using admin_blazor.Data
+@using admin_blazor.Models
+@attribute [Authorize(Roles = "Admin")]
+@inject AppDbContext Db
+@inject IJSRuntime JS
+
+<PageTitle>Мастер грамотей</PageTitle>
+
+<div class="container-fluid py-4">
+    <div class="mb-4">
+        <h1 class="h3 mb-1">Мастер грамотей</h1>
+        <p class="text-muted mb-0">Управление уроками</p>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <div class="alert alert-danger" role="alert">
+            @errorMessage
+        </div>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(successMessage))
+    {
+        <div class="alert alert-success" role="alert">
+            @successMessage
+        </div>
+    }
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-header">
+            <h2 class="h5 mb-0">Создать урок</h2>
+        </div>
+
+        <div class="card-body">
+            <EditForm Model="newLesson" OnSubmit="CreateLesson">
+                <div class="row g-3">
+                    <div class="col-md-2">
+                        <label for="lessonNumber" class="form-label">
+                            Номер урока
+                        </label>
+                        <input id="lessonNumber"
+                               type="number"
+                               min="0"
+                               step="1"
+                               class="form-control"
+                               @bind="lessonNumberInput" />
+                    </div>
+
+                    <div class="col-md-4">
+                        <label for="lessonName" class="form-label">
+                            Название
+                        </label>
+                        <InputText id="lessonName"
+                                   class="form-control"
+                                   @bind-Value="newLesson.Name" />
+                    </div>
+
+                    <div class="col-md-3">
+                        <label for="requiredScore" class="form-label">
+                            Проходной балл
+                        </label>
+                        <InputNumber TValue="double?"
+                                     id="requiredScore"
+                                     class="form-control"
+                                     @bind-Value="newLesson.RequiredScore" />
+                    </div>
+
+                    <div class="col-md-3">
+                        <label for="maxScore" class="form-label">
+                            Максимальный балл
+                        </label>
+                        <InputText id="maxScore"
+                                   class="form-control"
+                                   @bind-Value="newLesson.MaxScore" />
+                    </div>
+                </div>
+
+                <div class="mt-3">
+                    <button type="submit"
+                            class="btn btn-primary"
+                            disabled="@isSaving">
+                        @(isSaving ? "Сохранение..." : "Создать урок")
+                    </button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h2 class="h5 mb-0">Уроки</h2>
+            <span class="badge text-bg-secondary">@lessons.Count</span>
+        </div>
+
+        <div class="card-body p-0">
+            @if (isLoading)
+            {
+                <div class="p-4 text-muted">Загрузка уроков...</div>
+            }
+            else if (lessons.Count == 0)
+            {
+                <div class="p-4 text-muted">Уроки пока не созданы.</div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="ps-3">№</th>
+                                <th>Название</th>
+                                <th>Проходной балл</th>
+                                <th>Максимальный балл</th>
+                                <th class="text-end pe-3">Действия</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var lesson in lessons)
+                            {
+                                <tr @key="lesson.Id">
+                                    <td class="ps-3">
+                                        @(lesson.Number?.ToString() ?? "—")
+                                    </td>
+                                    <td>
+                                        @(string.IsNullOrWhiteSpace(lesson.Name)
+                                            ? "Без названия"
+                                            : lesson.Name)
+                                    </td>
+                                    <td>
+                                        @(lesson.RequiredScore?.ToString("0.##") ?? "—")
+                                    </td>
+                                    <td>
+                                        @(string.IsNullOrWhiteSpace(lesson.MaxScore)
+                                            ? "—"
+                                            : lesson.MaxScore)
+                                    </td>
+                                    <td class="text-end pe-3">
+                                        <div class="d-inline-flex gap-2">
+                                            <a class="btn btn-sm btn-outline-primary"
+                                               href="@($"/master/theory/{lesson.Id}")">
+                                                Теория
+                                            </a>
+
+                                            <button type="button"
+                                                    class="btn btn-sm btn-outline-danger"
+                                                    @onclick="() => DeleteLesson(lesson.Id)"
+                                                    disabled="@isSaving">
+                                                Удалить
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<Poliglot> lessons = [];
+    private Poliglot newLesson = new();
+
+    private string lessonNumberInput = string.Empty;
+
+    private bool isLoading = true;
+    private bool isSaving;
+
+    private string? errorMessage;
+    private string? successMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadLessons();
+    }
+
+    private async Task LoadLessons()
+    {
+        isLoading = true;
+        errorMessage = null;
+
+        try
+        {
+            lessons = await Db.Poliglots
+                .AsNoTracking()
+                .OrderBy(lesson => lesson.Number)
+                .ThenBy(lesson => lesson.Id)
+                .ToListAsync();
+        }
+        catch (Exception)
+        {
+            errorMessage = "Не удалось загрузить уроки. Проверь подключение к базе данных.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task CreateLesson(EditContext editContext)
+    {
+        errorMessage = null;
+        successMessage = null;
+
+        if (!uint.TryParse(lessonNumberInput, out var parsedNumber))
+        {
+            errorMessage = "Укажи корректный номер урока.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(newLesson.Name))
+        {
+            errorMessage = "Укажи название урока.";
+            return;
+        }
+
+        if (newLesson.RequiredScore < 0)
+        {
+            errorMessage = "Проходной балл не может быть отрицательным.";
+            return;
+        }
+
+        isSaving = true;
+
+        try
+        {
+            var lesson = new Poliglot
+            {
+                Number = parsedNumber,
+                Name = newLesson.Name.Trim(),
+                RequiredScore = newLesson.RequiredScore,
+                MaxScore = string.IsNullOrWhiteSpace(newLesson.MaxScore)
+                    ? null
+                    : newLesson.MaxScore.Trim()
+            };
+
+            Db.Poliglots.Add(lesson);
+            await Db.SaveChangesAsync();
+
+            newLesson = new Poliglot();
+            lessonNumberInput = string.Empty;
+
+            lessons = await Db.Poliglots
+                .AsNoTracking()
+                .OrderBy(item => item.Number)
+                .ThenBy(item => item.Id)
+                .ToListAsync();
+
+            successMessage = "Урок создан.";
+        }
+        catch (Exception)
+        {
+            errorMessage = "Не удалось создать урок. Проверь данные и подключение к базе данных.";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task DeleteLesson(uint lessonId)
+    {
+        errorMessage = null;
+        successMessage = null;
+
+        if (isSaving)
+            return;
+
+        var confirmed = await JS.InvokeAsync<bool>(
+            "confirm",
+            "Удалить этот урок? Записи теории останутся в базе данных.");
+
+        if (!confirmed)
+            return;
+
+        isSaving = true;
+
+        try
+        {
+            var lesson = await Db.Poliglots
+                .FirstOrDefaultAsync(item => item.Id == lessonId);
+
+            if (lesson is null)
+            {
+                errorMessage = "Урок не найден.";
+                return;
+            }
+
+            Db.Poliglots.Remove(lesson);
+            await Db.SaveChangesAsync();
+
+            lessons.RemoveAll(item => item.Id == lessonId);
+
+            successMessage = "Урок удалён. Записи теории сохранены.";
+        }
+        catch (Exception)
+        {
+            errorMessage = "Не удалось удалить урок.";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+}

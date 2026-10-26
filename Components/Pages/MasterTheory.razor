@@ -1,0 +1,163 @@
+
+@page "/master/theory/{Id:long}"
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Components.Forms
+@using admin_blazor.Data
+@using admin_blazor.Models
+@attribute [Authorize(Roles = "Admin")]
+@inject AppDbContext Db
+@inject NavigationManager Navigation
+
+<PageTitle>Теория урока</PageTitle>
+
+<div class="container-fluid py-4">
+    <div class="mb-4">
+        <a href="/master" class="btn btn-outline-secondary btn-sm mb-3">
+            ← К списку уроков
+        </a>
+
+        <h1 class="h3 mb-1">Теория урока</h1>
+
+        @if (lesson is not null)
+        {
+            <p class="text-muted mb-0">
+                Урок № @(lesson.Number?.ToString() ?? "—") — @lesson.Name
+            </p>
+        }
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="alert alert-info">Загрузка урока...</div>
+    }
+    else if (lesson is null)
+    {
+        <div class="alert alert-warning">
+            Урок не найден.
+        </div>
+    }
+    else
+    {
+        @if (!string.IsNullOrWhiteSpace(errorMessage))
+        {
+            <div class="alert alert-danger" role="alert">
+                @errorMessage
+            </div>
+        }
+
+        <div class="card shadow-sm">
+            <div class="card-header">
+                <h2 class="h5 mb-0">Добавить теорию</h2>
+            </div>
+
+            <div class="card-body">
+                <EditForm Model="form" OnValidSubmit="SaveTheory">
+                    <div class="mb-3">
+                        <label for="lessonContent" class="form-label">
+                            Содержание теории
+                        </label>
+
+                        <InputTextArea id="lessonContent"
+                                       class="form-control"
+                                       rows="12"
+                                       @bind-Value="form.Content" />
+                    </div>
+
+                    <button type="submit"
+                            class="btn btn-primary"
+                            disabled="@isSaving">
+                        @(isSaving ? "Сохранение..." : "Сохранить")
+                    </button>
+                </EditForm>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public long Id { get; set; }
+
+    private Poliglot? lesson;
+    private TheoryForm form = new();
+
+    private bool isLoading = true;
+    private bool isSaving;
+    private string? errorMessage;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        isLoading = true;
+        errorMessage = null;
+
+        try
+        {
+            if (Id <= 0 || Id > uint.MaxValue)
+            {
+                lesson = null;
+                return;
+            }
+
+            var lessonId = (uint)Id;
+
+            lesson = await Db.Poliglots
+                .AsNoTracking()
+                .FirstOrDefaultAsync(item => item.Id == lessonId);
+        }
+        catch (Exception)
+        {
+            errorMessage = "Не удалось загрузить урок.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task SaveTheory()
+    {
+        errorMessage = null;
+
+        if (lesson is null)
+            return;
+
+        if (string.IsNullOrWhiteSpace(form.Content))
+        {
+            errorMessage = "Введи содержание теории.";
+            return;
+        }
+
+        if (isSaving)
+            return;
+
+        isSaving = true;
+
+        try
+        {
+            var theory = new Teory
+            {
+                LessonId = lesson.Id,
+                Content = form.Content
+            };
+
+            Db.Teorys.Add(theory);
+            await Db.SaveChangesAsync();
+
+            Navigation.NavigateTo("/master");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Ошибка сохранения: {ex.Message}";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private sealed class TheoryForm
+    {
+        public string? Content { get; set; }
+    }
+}

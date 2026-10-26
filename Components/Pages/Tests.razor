@@ -1,0 +1,239 @@
+@page "/tests"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin")]
+
+@using admin_blazor.Data
+@using admin_blazor.Models
+@using Microsoft.EntityFrameworkCore
+@inject AppDbContext DbContext
+
+<PageTitle>Тесты</PageTitle>
+
+<div class="container-fluid py-3">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
+        <div>
+            <h1 class="h3 mb-1">Тесты</h1>
+            <p class="text-muted mb-0">
+                Управление тестами и вопросами
+            </p>
+        </div>
+
+        <a href="/tests/create" class="btn btn-primary">
+            <span class="me-1">+</span>
+            Создать тест
+        </a>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <div class="alert alert-danger" role="alert">
+            @errorMessage
+        </div>
+    }
+
+    @if (isLoading)
+    {
+        <div class="d-flex justify-content-center py-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Загрузка...</span>
+            </div>
+        </div>
+    }
+    else if (tests.Count == 0)
+    {
+        <div class="card border-0 shadow-sm">
+            <div class="card-body text-center py-5">
+                <div class="mb-3">
+                    <i class="bi bi-clipboard2-check fs-1 text-secondary"></i>
+                </div>
+
+                <h2 class="h5 mb-2">Тестов пока нет</h2>
+
+                <p class="text-muted mb-4">
+                    Создай первый тест, чтобы добавить в него вопросы.
+                </p>
+
+                <a href="/tests/create" class="btn btn-primary">
+                    Создать тест
+                </a>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="row g-3">
+            @foreach (var item in tests)
+            {
+                <div class="col-12 col-md-6 col-xl-4" @key="item.Quiz.Id">
+                    <div class="card h-100 border-0 shadow-sm test-card">
+                        <div class="card-body d-flex flex-column p-4">
+                            <div class="d-flex align-items-start gap-3 mb-3">
+                                <div class="test-card-icon rounded-3 d-flex align-items-center justify-content-center flex-shrink-0">
+                                    <i class="bi bi-clipboard2-check"></i>
+                                </div>
+
+                                <div class="flex-grow-1 min-w-0">
+                                    <h2 class="h5 mb-1 text-break">
+                                        @(string.IsNullOrWhiteSpace(item.Quiz.Name)
+                                            ? "Без названия"
+                                            : item.Quiz.Name)
+                                    </h2>
+
+                                    <div class="small text-muted">
+                                        Код теста:
+                                        @(item.Quiz.Vendor?.ToString() ?? "Не указан")
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="test-card-description text-muted mb-4">
+                                @if (!string.IsNullOrWhiteSpace(item.Quiz.Description))
+                                {
+                                    @item.Quiz.Description
+                                }
+                                else
+                                {
+                                    <span>Описание не добавлено</span>
+                                }
+                            </div>
+
+                            <div class="d-flex align-items-center justify-content-between border-top pt-3 mt-auto mb-3">
+                                <span class="text-muted small">
+                                    <i class="bi bi-list-check me-1"></i>
+                                    Вопросов
+                                </span>
+
+                                <span class="badge rounded-pill text-bg-light border fs-6">
+                                    @item.QuestionCount
+                                </span>
+                            </div>
+
+                            @if (item.Quiz.Vendor.HasValue)
+                            {
+                                <a class="btn btn-outline-primary w-100"
+                                   href="@($"/tests/{item.Quiz.Vendor.Value}/questions")">
+                                    Открыть вопросы
+                                    <i class="bi bi-arrow-right ms-1"></i>
+                                </a>
+                            }
+                            else
+                            {
+                                <button class="btn btn-outline-secondary w-100" disabled>
+                                    Нет кода теста
+                                </button>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+
+        <div class="text-muted small mt-4">
+            Всего тестов: @tests.Count
+        </div>
+    }
+</div>
+
+<style>
+    .test-card {
+        border-radius: 12px;
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .test-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 0.5rem 1.25rem rgba(0, 0, 0, 0.09) !important;
+    }
+
+    .test-card-icon {
+        width: 46px;
+        height: 46px;
+        background-color: var(--bs-primary-bg-subtle);
+        color: var(--bs-primary);
+        font-size: 1.4rem;
+    }
+
+    .test-card-description {
+        min-height: 48px;
+        white-space: pre-line;
+        overflow-wrap: anywhere;
+    }
+
+    .min-w-0 {
+        min-width: 0;
+    }
+
+    @@media (max-width: 575.98px) {
+        .test-card .card-body {
+            padding: 1rem !important;
+        }
+    }
+
+    @@media (prefers-reduced-motion: reduce) {
+        .test-card {
+            transition: none;
+        }
+
+        .test-card:hover {
+            transform: none;
+        }
+    }
+</style>
+
+@code {
+    private List<QuizRow> tests = [];
+    private bool isLoading = true;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var quizzes = await DbContext.Quizzes
+                .AsNoTracking()
+                .OrderBy(q => q.Name)
+                .ThenBy(q => q.Id)
+                .ToListAsync();
+
+            var questionCounts = await DbContext.QuizQuestions
+                .AsNoTracking()
+                .Where(q => q.QuizId.HasValue)
+                .GroupBy(q => q.QuizId!.Value)
+                .Select(group => new
+                {
+                    Vendor = group.Key,
+                    Count = group.Count()
+                })
+                .ToDictionaryAsync(x => x.Vendor, x => x.Count);
+
+            tests = quizzes.Select(quiz =>
+            {
+                var count = 0;
+
+                if (quiz.Vendor.HasValue)
+                {
+                    questionCounts.TryGetValue(quiz.Vendor.Value, out count);
+                }
+
+                return new QuizRow
+                {
+                    Quiz = quiz,
+                    QuestionCount = count
+                };
+            }).ToList();
+        }
+        catch (Exception)
+        {
+            errorMessage = "Не удалось загрузить тесты. Проверь подключение к базе данных.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private sealed class QuizRow
+    {
+        public required Quiz Quiz { get; init; }
+        public int QuestionCount { get; init; }
+    }
+}

@@ -1,0 +1,324 @@
+@page "/tests/{vendor:int}/questions"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin")]
+
+@using System.ComponentModel.DataAnnotations
+@using admin_blazor.Data
+@using admin_blazor.Models
+@using Microsoft.EntityFrameworkCore
+
+@inject AppDbContext DbContext
+@inject NavigationManager Navigation
+
+<PageTitle>@(quiz?.Name ?? "Вопросы теста")</PageTitle>
+
+<div class="container-fluid py-3">
+    <div class="mb-4">
+        <a href="/tests" class="text-decoration-none">
+            <i class="bi bi-arrow-left me-1"></i>
+            Все тесты
+        </a>
+
+        @if (quiz is not null)
+        {
+            <h1 class="h3 mt-3 mb-1">@quiz.Name</h1>
+            <p class="text-muted mb-0">
+                Управление вопросами теста
+            </p>
+        }
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="text-muted">Загрузка теста...</div>
+    }
+    else if (quiz is null)
+    {
+        <div class="alert alert-warning">
+            Тест не найден.
+            <a href="/tests" class="alert-link">Вернуться к списку тестов</a>
+        </div>
+    }
+    else
+    {
+        @if (!string.IsNullOrWhiteSpace(successMessage))
+        {
+            <div class="alert alert-success">@successMessage</div>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(errorMessage))
+        {
+            <div class="alert alert-danger">@errorMessage</div>
+        }
+
+        <div class="row g-4">
+            <div class="col-12 col-xl-7">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body p-4">
+                        <h2 class="h5 mb-4">Добавить вопрос</h2>
+
+                        <EditForm Model="model" OnValidSubmit="SaveQuestionAsync">
+                            <DataAnnotationsValidator />
+
+                            <div class="mb-3">
+                                <label class="form-label" for="question">
+                                    Вопрос
+                                </label>
+                                <InputTextArea id="question"
+                                               class="form-control"
+                                               @bind-Value="model.Question"
+                                               rows="3" />
+                                <ValidationMessage For="() => model.Question" />
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label" for="answer1">
+                                    Ответ 1
+                                </label>
+                                <InputText id="answer1"
+                                           class="form-control"
+                                           @bind-Value="model.Answer1" />
+                                <ValidationMessage For="() => model.Answer1" />
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label" for="answer2">
+                                    Ответ 2
+                                </label>
+                                <InputText id="answer2"
+                                           class="form-control"
+                                           @bind-Value="model.Answer2" />
+                                <ValidationMessage For="() => model.Answer2" />
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label" for="answer3">
+                                    Ответ 3
+                                </label>
+                                <InputText id="answer3"
+                                           class="form-control"
+                                           @bind-Value="model.Answer3" />
+                                <ValidationMessage For="() => model.Answer3" />
+                            </div>
+
+                            <div class="mb-4">
+                                <label class="form-label" for="correctAnswer">
+                                    Правильный ответ
+                                </label>
+                                <InputSelect id="correctAnswer"
+                                             class="form-select"
+                                             @bind-Value="model.CorrectAnswer">
+                                    <option value="1">Ответ 1</option>
+                                    <option value="2">Ответ 2</option>
+                                    <option value="3">Ответ 3</option>
+                                </InputSelect>
+                            </div>
+
+                            <button type="submit"
+                                    class="btn btn-primary"
+                                    disabled="@isSaving">
+                                @if (isSaving)
+                                {
+                                    <span>Сохранение...</span>
+                                }
+                                else
+                                {
+                                    <span>Сохранить вопрос</span>
+                                }
+                            </button>
+                        </EditForm>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 col-xl-5">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body p-4">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h2 class="h5 mb-0">Вопросы теста</h2>
+                            <span class="badge bg-secondary">@questions.Count</span>
+                        </div>
+
+                        @if (questions.Count == 0)
+                        {
+                            <p class="text-muted mb-0">
+                                Вопросов пока нет. Добавь первый вопрос с помощью формы.
+                            </p>
+                        }
+                        else
+                        {
+                            @for (var i = 0; i < questions.Count; i++)
+                            {
+                                var item = questions[i];
+
+                                <div class="border rounded p-3 mb-3">
+                                    <div class="fw-semibold mb-2">
+                                        @(i + 1). @item.Question
+                                    </div>
+
+                                    <div class="small text-muted">
+                                        Варианты ответов:
+                                    </div>
+
+                                    <ol class="mb-2">
+                                        <li class="@(item.CorrectAnswer == 1 ? "text-success fw-semibold" : "")">
+                                            @item.Answer1
+                                            @if (item.CorrectAnswer == 1)
+                                            {
+                                                <span> — правильный</span>
+                                            }
+                                        </li>
+                                        <li class="@(item.CorrectAnswer == 2 ? "text-success fw-semibold" : "")">
+                                            @item.Answer2
+                                            @if (item.CorrectAnswer == 2)
+                                            {
+                                                <span> — правильный</span>
+                                            }
+                                        </li>
+                                        <li class="@(item.CorrectAnswer == 3 ? "text-success fw-semibold" : "")">
+                                            @item.Answer3
+                                            @if (item.CorrectAnswer == 3)
+                                            {
+                                                <span> — правильный</span>
+                                            }
+                                        </li>
+                                    </ol>
+                                </div>
+                            }
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public int vendor { get; set; }
+
+    private Quiz? quiz;
+    private List<QuizQuestion> questions = [];
+    private readonly QuestionFormModel model = new();
+
+    private bool isLoading = true;
+    private bool isSaving;
+    private string? errorMessage;
+    private string? successMessage;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        isLoading = true;
+        errorMessage = null;
+        successMessage = null;
+        quiz = null;
+        questions = [];
+
+        if (vendor <= 0)
+        {
+            errorMessage = "Некорректный идентификатор теста.";
+            isLoading = false;
+            return;
+        }
+
+        var vendorId = (uint)vendor;
+
+        try
+        {
+            quiz = await DbContext.Quizzes
+                .AsNoTracking()
+                .FirstOrDefaultAsync(q => q.Vendor == vendorId);
+
+            if (quiz is not null)
+            {
+                await LoadQuestionsAsync(vendorId);
+            }
+        }
+        catch
+        {
+            errorMessage = "Не удалось загрузить данные теста.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task LoadQuestionsAsync(uint vendorId)
+    {
+        questions = await DbContext.QuizQuestions
+            .AsNoTracking()
+            .Where(q => q.QuizId == vendorId)
+            .OrderBy(q => q.Id)
+            .ToListAsync();
+    }
+
+    private async Task SaveQuestionAsync()
+    {
+        if (isSaving || quiz is null || vendor <= 0)
+        {
+            return;
+        }
+
+        isSaving = true;
+        errorMessage = null;
+        successMessage = null;
+
+        try
+        {
+            var vendorId = (uint)vendor;
+
+            var question = new QuizQuestion
+            {
+                QuizId = vendorId,
+                Question = model.Question.Trim(),
+                Answer1 = model.Answer1.Trim(),
+                Answer2 = model.Answer2.Trim(),
+                Answer3 = model.Answer3.Trim(),
+                CorrectAnswer = model.CorrectAnswer
+            };
+
+            DbContext.QuizQuestions.Add(question);
+            await DbContext.SaveChangesAsync();
+
+            await LoadQuestionsAsync(vendorId);
+
+            model.Question = string.Empty;
+            model.Answer1 = string.Empty;
+            model.Answer2 = string.Empty;
+            model.Answer3 = string.Empty;
+            model.CorrectAnswer = 1;
+
+            successMessage = "Вопрос успешно добавлен.";
+        }
+        catch
+        {
+            errorMessage = "Не удалось сохранить вопрос. Проверь подключение к базе данных.";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private sealed class QuestionFormModel
+    {
+        [Required(ErrorMessage = "Введи текст вопроса.")]
+        [StringLength(191, ErrorMessage = "Вопрос не должен превышать 191 символ.")]
+        public string Question { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Заполни первый вариант ответа.")]
+        [StringLength(191)]
+        public string Answer1 { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Заполни второй вариант ответа.")]
+        [StringLength(191)]
+        public string Answer2 { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Заполни третий вариант ответа.")]
+        [StringLength(191)]
+        public string Answer3 { get; set; } = string.Empty;
+
+        [Range(1, 3, ErrorMessage = "Выбери правильный ответ.")]
+        public uint CorrectAnswer { get; set; } = 1;
+    }
+}

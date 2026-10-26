@@ -1,0 +1,174 @@
+@page "/tests/create"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin")]
+
+@using System.ComponentModel.DataAnnotations
+@using System.Security.Cryptography
+@using admin_blazor.Data
+@using admin_blazor.Models
+@using Microsoft.EntityFrameworkCore
+@inject AppDbContext DbContext
+@inject NavigationManager Navigation
+
+<PageTitle>Создать тест</PageTitle>
+
+<div class="container-fluid py-3">
+    <div class="mb-4">
+        <a href="/tests" class="text-decoration-none">
+            <i class="bi bi-arrow-left me-1"></i>
+            Все тесты
+        </a>
+
+        <h1 class="h3 mt-3 mb-1">Создание теста</h1>
+        <p class="text-muted mb-0">
+            Укажи название и описание нового теста.
+        </p>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <div class="alert alert-danger" role="alert">
+            @errorMessage
+        </div>
+    }
+
+    <div class="card border-0 shadow-sm" style="max-width: 760px;">
+        <div class="card-body p-4">
+            <EditForm Model="model" OnValidSubmit="CreateTestAsync">
+                <DataAnnotationsValidator />
+
+                <div class="mb-4">
+                    <label for="testName" class="form-label">
+                        Название теста
+                    </label>
+
+                    <InputText id="testName"
+                               class="form-control"
+                               @bind-Value="model.Name"
+                               maxlength="191"
+                               placeholder="Например, Английская грамматика" />
+
+                    <ValidationMessage For="() => model.Name" />
+                </div>
+
+                <div class="mb-4">
+                    <label for="testDescription" class="form-label">
+                        Описание
+                    </label>
+
+                    <InputTextArea id="testDescription"
+                                   class="form-control"
+                                   @bind-Value="model.Description"
+                                   rows="5"
+                                   placeholder="Краткое описание теста..." />
+
+                    <ValidationMessage For="() => model.Description" />
+                </div>
+
+                <div class="d-flex flex-wrap gap-2">
+                    <button type="submit"
+                            class="btn btn-primary"
+                            disabled="@isSaving">
+                        @if (isSaving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2"
+                                  role="status"
+                                  aria-hidden="true"></span>
+                            <span>Сохранение...</span>
+                        }
+                        else
+                        {
+                            <span>Создать тест</span>
+                        }
+                    </button>
+
+                    <a href="/tests" class="btn btn-outline-secondary">
+                        Отмена
+                    </a>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+</div>
+
+@code {
+    private readonly TestFormModel model = new();
+
+    private bool isSaving;
+    private string? errorMessage;
+
+    private async Task CreateTestAsync()
+    {
+        if (isSaving)
+        {
+            return;
+        }
+
+        isSaving = true;
+        errorMessage = null;
+
+        try
+        {
+            uint vendor = 0;
+            var vendorFound = false;
+
+            // Сохраняем формат кода старой PHP-системы.
+            // Перед сохранением проверяем, что код ещё не используется.
+            for (var attempt = 0; attempt < 100; attempt++)
+            {
+                var candidate = (uint)RandomNumberGenerator.GetInt32(111111, 1000000);
+
+                var exists = await DbContext.Quizzes
+                    .AsNoTracking()
+                    .AnyAsync(q => q.Vendor == candidate);
+
+                if (!exists)
+                {
+                    vendor = candidate;
+                    vendorFound = true;
+                    break;
+                }
+            }
+
+            if (!vendorFound)
+            {
+                errorMessage = "Не удалось подобрать уникальный код теста. Попробуй ещё раз.";
+                return;
+            }
+
+            var quiz = new Quiz
+            {
+                Vendor = vendor,
+                Name = model.Name.Trim(),
+                Description = string.IsNullOrWhiteSpace(model.Description)
+                    ? null
+                    : model.Description.Trim()
+            };
+
+            DbContext.Quizzes.Add(quiz);
+            await DbContext.SaveChangesAsync();
+
+            Navigation.NavigateTo($"/tests/{vendor}/questions");
+        }
+        catch (DbUpdateException)
+        {
+            errorMessage = "Не удалось сохранить тест в базе данных. Проверь данные и попробуй ещё раз.";
+        }
+        catch (Exception)
+        {
+            errorMessage = "При создании теста произошла ошибка.";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private sealed class TestFormModel
+    {
+        [Required(ErrorMessage = "Укажи название теста.")]
+        [StringLength(191, ErrorMessage = "Название не должно превышать 191 символ.")]
+        public string Name { get; set; } = string.Empty;
+
+        public string? Description { get; set; }
+    }
+}
