@@ -30,3 +30,7 @@ Thumbs.db
 # Пользовательские фотографии
 /wwwroot/images/user/*
 !/wwwroot/images/user/avatar-1.jpg
+
+# Локальные сборки публикации
+/publish/
+/publish-linux/
