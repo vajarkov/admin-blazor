@@ -3,8 +3,11 @@
 @using admin_blazor.Data
 @using admin_blazor.Models
 @using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Components
+@using Microsoft.JSInterop
 @using System.Globalization
 @inject AppDbContext Db
+@inject IJSRuntime JS
 
 <PageTitle>Расписание</PageTitle>
 
@@ -95,8 +98,15 @@
 
                     <div class="d-flex flex-wrap gap-2">
                         <a class="btn btn-outline-primary btn-sm"
-                        href="@($"/teacher-report?teacherId={selectedTeacherId}&month={month.Month}&year={month.Year}")">
+                           href="@($"/teacher-report?teacherId={selectedTeacherId}&month={month.Month}&year={month.Year}")">
                             Отчёт преподавателя
+                        </a>
+
+                        <a class="btn btn-outline-primary btn-sm"
+                           href="https://teacher.level-english.kz/assets/admin/news/login.php?user=11"
+                           target="_blank"
+                           rel="noopener noreferrer">
+                            Открыть расписание
                         </a>
 
                         <button type="button"
@@ -166,11 +176,68 @@
                 </div>
 
                 <div class="text-muted small mt-3">
-                    Выбери день в календаре, чтобы просмотреть или изменить свободные слоты.
+                    Выбери день в календаре, чтобы просмотреть бронирования и изменить свободные слоты.
                 </div>
             </div>
         </div>
 
+        @* Забронированные уроки *@
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-body d-flex flex-wrap justify-content-between align-items-center gap-2">
+                <h2 class="h5 mb-0">
+                    Забронированные уроки на @selectedDate.ToString("dd.MM.yyyy")
+                </h2>
+                <span class="badge text-bg-primary">@SelectedDayBookings.Count</span>
+            </div>
+
+            <div class="card-body">
+                @if (SelectedDayBookings.Count == 0)
+                {
+                    <div class="text-muted">
+                        На выбранную дату забронированных уроков нет.
+                    </div>
+                }
+                else
+                {
+                    <div class="row g-3">
+                        @foreach (var booking in SelectedDayBookings)
+                        {
+                            <div class="col-12 col-md-6 col-xl-4" @key="booking.Vendor">
+                                <div class="booking-card h-100 @(booking.IsGroup ? "booking-card-group" : "booking-card-student")">
+                                    <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                                        <span class="badge @(booking.IsGroup ? "text-bg-success" : "text-bg-primary")">
+                                            @(booking.IsGroup ? "Групповой урок" : "Индивидуальный урок")
+                                        </span>
+                                        <strong class="text-nowrap">@booking.TimeLabel</strong>
+                                    </div>
+
+                                    <div class="fw-semibold booking-name">
+                                        @booking.DisplayName
+                                    </div>
+
+                                    <div class="text-muted small mt-2">
+                                        Бронирование #@booking.Vendor
+                                    </div>
+
+                                    <div class="d-flex flex-wrap gap-2 mt-3">
+                                        <a class="btn btn-outline-primary btn-sm"
+                                        href="@($"/lesson/{booking.Vendor}")">
+                                            Перейти к уроку
+                                        </a>
+
+                                        
+                                    </div>
+
+                                    
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+
+        @* Редактор свободных слотов *@
         <div class="card shadow-sm">
             <div class="card-header bg-body d-flex flex-wrap justify-content-between align-items-center gap-2">
                 <div>
@@ -328,6 +395,25 @@
         overflow-wrap: anywhere;
     }
 
+    .booking-card {
+        border: 1px solid var(--bs-border-color);
+        border-radius: 8px;
+        padding: 14px;
+        background: var(--bs-body-bg);
+    }
+
+    .booking-card-student {
+        border-left: 4px solid var(--bs-primary);
+    }
+
+    .booking-card-group {
+        border-left: 4px solid var(--bs-success);
+    }
+
+    .booking-name {
+        overflow-wrap: anywhere;
+    }
+
     .schedule-slot {
         display: flex;
         align-items: center;
@@ -359,7 +445,7 @@
         opacity: .65;
     }
 
-   @@media (max-width: 575.98px) {
+    @@media (max-width: 575.98px) {
         .schedule-day {
             min-height: 64px;
             padding: 4px;
@@ -376,6 +462,7 @@
 </style>
 
 @code {
+    
     private static readonly CultureInfo ruCulture =
         CultureInfo.GetCultureInfo("ru-RU");
 
@@ -385,9 +472,14 @@
     private static readonly TimeZoneInfo AlmatyTimeZone =
         TimeZoneInfo.FindSystemTimeZoneById("Asia/Almaty");
 
+    private const string LessonEntryUrl =
+        "https://teacher.level-english.kz/assets/admin/news/login.php?user=11";
+
     private List<Teacher> teachers = [];
     private List<Schedule> schedules = [];
     private List<Reserv> reservations = [];
+    private List<User> students = [];
+    private List<StudyGroup> studyGroups = [];
 
     private readonly HashSet<int> selectedHours = [];
 
@@ -398,6 +490,12 @@
     private string? successMessage;
 
     private uint selectedTeacherId;
+
+    [SupplyParameterFromQuery(Name = "teacherId")]
+    public string? QueryTeacherId { get; set; }
+
+    [SupplyParameterFromQuery(Name = "date")]
+    public string? QueryDate { get; set; }
     private DateTime month = new(DateTime.Today.Year, DateTime.Today.Month, 1);
     private DateTime selectedDate = DateTime.Today;
 
@@ -412,7 +510,59 @@
 
     private sealed record DayInfo(int Free, int Busy, int Cancelled);
 
+    private sealed record BookingInfo(
+        double? Vendor,
+        bool IsGroup,
+        string DisplayName,
+        string TimeLabel,
+        long SortTime);
+
     private List<SlotInfo> DailySlots { get; set; } = [];
+
+    private List<BookingInfo> SelectedDayBookings =>
+        reservations
+            .Where(r => r.Status != 0
+                        && r.Timecode.HasValue
+                        && TimestampToAlmatyDate(r.Timecode.Value) == selectedDate.Date)
+            .Select(r =>
+            {
+                var isGroup = r.For != 1;
+                string displayName;
+
+                if (isGroup)
+                {
+                    var group = studyGroups.FirstOrDefault(g =>
+                        g.Vendor.HasValue
+                        && r.Student.HasValue
+                        && g.Vendor.Value == r.Student.Value);
+
+                    displayName = group?.Name
+                                  ?? $"Группа #{r.Student?.ToString() ?? "?"}";
+                }
+                else
+                {
+                    var student = students.FirstOrDefault(s =>
+                        r.Student.HasValue && s.Id == r.Student.Value);
+
+                    displayName = student is null
+                        ? $"Студент #{r.Student?.ToString() ?? "?"}"
+                        : $"{student.Name} {student.Surname}".Trim();
+
+                    if (string.IsNullOrWhiteSpace(displayName))
+                        displayName = $"Студент #{student?.Id.ToString() ?? "?"}";
+                }
+
+                var localTime = TimestampToAlmatyDateTime(r.Timecode!.Value);
+
+                return new BookingInfo(
+                    r.Vendor,
+                    isGroup,
+                    displayName,
+                    localTime.ToString("HH:mm", CultureInfo.InvariantCulture),
+                    r.Timecode.Value);
+            })
+            .OrderBy(b => b.SortTime)
+            .ToList();
 
     private IEnumerable<DateTime?> CalendarDays
     {
@@ -438,17 +588,40 @@
                 .AsNoTracking()
                 .OrderBy(t => t.Login)
                 .ToListAsync();
+
+            if (uint.TryParse(QueryTeacherId, out var teacherId) &&
+                teachers.Any(t => t.Id == teacherId))
+            {
+                selectedTeacherId = teacherId;
+
+                if (DateTime.TryParseExact(
+                    QueryDate,
+                    "yyyy-MM-dd",
+                    CultureInfo.InvariantCulture,
+                    DateTimeStyles.None,
+                    out var restoredDate))
+                {
+                    selectedDate = restoredDate.Date;
+                    month = new DateTime(
+                        restoredDate.Year,
+                        restoredDate.Month,
+                        1);
+                }
+
+                await LoadTeacherScheduleAsync();
+                BuildDailySlots();
+            }
         }
         catch (Exception ex)
         {
-            loadError = $"Не удалось загрузить преподавателей: {ex.GetBaseException().Message}";
+            loadError =
+                $"Не удалось загрузить расписание: {ex.GetBaseException().Message}";
         }
         finally
         {
             isLoading = false;
         }
     }
-
     private async Task ChangeTeacherAsync(ChangeEventArgs args)
     {
         if (!uint.TryParse(args.Value?.ToString(), out var teacherId))
@@ -462,6 +635,8 @@
         {
             schedules = [];
             reservations = [];
+            students = [];
+            studyGroups = [];
             DailySlots = [];
             selectedHours.Clear();
             return;
@@ -478,8 +653,6 @@
 
         try
         {
-            // В существующей БД заполнено schedules.teacher,
-            // а schedules.teacher_id у записей NULL.
             schedules = await Db.Schedules
                 .AsNoTracking()
                 .Where(s => s.Teacher == selectedTeacherId)
@@ -489,17 +662,62 @@
                 .AsNoTracking()
                 .Where(r => r.Teacher == selectedTeacherId)
                 .ToListAsync();
+
+            var studentIds = reservations
+                .Where(r => r.For == 1 && r.Student.HasValue)
+                .Select(r => r.Student!.Value)
+                .Distinct()
+                .ToList();
+
+            students = studentIds.Count == 0
+                ? []
+                : await Db.Users
+                    .AsNoTracking()
+                    .Where(u => studentIds.Contains(u.Id))
+                    .ToListAsync();
+
+            var groupVendors = reservations
+                .Where(r => r.For != 1 && r.Student.HasValue)
+                .Select(r => r.Student!.Value)
+                .Distinct()
+                .ToList();
+
+            studyGroups = groupVendors.Count == 0
+                ? []
+                : await Db.Groups
+                    .AsNoTracking()
+                    .Where(g => g.Vendor.HasValue && groupVendors.Contains(g.Vendor.Value))
+                    .ToListAsync();
         }
         catch (Exception ex)
         {
             loadError = $"Не удалось загрузить расписание: {ex.GetBaseException().Message}";
             schedules = [];
             reservations = [];
+            students = [];
+            studyGroups = [];
         }
         finally
         {
             isLoading = false;
         }
+    }
+
+    private string GetBookingStudentName(Reserv reserv)
+    {
+        if (!reserv.Student.HasValue)
+            return "неизвестный ученик";
+
+        var student = students.FirstOrDefault(s => s.Id == reserv.Student.Value);
+
+        if (student is null)
+            return $"ID {reserv.Student.Value}";
+
+        var name = $"{student.Name} {student.Surname}".Trim();
+
+        return string.IsNullOrWhiteSpace(name)
+            ? $"ID {student.Id}"
+            : name;
     }
 
     private async Task PreviousMonthAsync()
@@ -531,13 +749,14 @@
         return Task.CompletedTask;
     }
 
-    private async Task SelectDateAsync(DateTime date)
+    private Task SelectDateAsync(DateTime date)
     {
         selectedDate = date;
         successMessage = null;
         formError = null;
         BuildDailySlots();
-        await Task.CompletedTask;
+
+        return Task.CompletedTask;
     }
 
     private void BuildDailySlots()
@@ -670,8 +889,6 @@
 
         try
         {
-            // Загружаем актуальные записи перед изменением:
-            // нельзя полагаться только на ранее загруженный календарь.
             var currentSchedules = await Db.Schedules
                 .Where(s => s.Teacher == selectedTeacherId)
                 .ToListAsync();
@@ -681,8 +898,6 @@
                             && TimestampToAlmatyDate(timestamp) == selectedDate.Date)
                 .ToList();
 
-            // Удаляем только свободные слоты выбранного дня.
-            // Любая запись с ненулевым reserv остаётся нетронутой.
             var freeSlotsToDelete = currentDaySchedules
                 .Where(s => s.Reserv.HasValue && s.Reserv.Value == 0)
                 .ToList();
@@ -718,8 +933,6 @@
                 var dateText = selectedDate.ToString(
                     "dd.MM.yyyy", CultureInfo.InvariantCulture);
 
-                // Проверяем существующий свободный слот: его могли
-                // уже создать параллельно с открытой страницей.
                 var alreadyExists = currentDaySchedules.Any(s =>
                     TryGetTimestamp(s.Time, out var existingTimestamp)
                     && existingTimestamp == timestamp);

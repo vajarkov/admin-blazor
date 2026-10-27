@@ -50,6 +50,7 @@ builder.Services.AddRazorComponents()
 
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<AuthService>();
+builder.Services.AddHttpClient();
 
 // Доверяем forwarded-заголовкам только от локального Apache.
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
@@ -74,7 +75,7 @@ builder.Services
         options.Cookie.HttpOnly = true;
         options.Cookie.SameSite = SameSiteMode.Lax;
         options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
-        options.ExpireTimeSpan = TimeSpan.FromHours(8);
+        options.ExpireTimeSpan = TimeSpan.FromMinutes(15);
         options.SlidingExpiration = true;
     });
 

@@ -1,0 +1,447 @@
+@page "/lesson/{Id:long}"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin")]
+@rendermode InteractiveServer
+
+@using admin_blazor.Data
+@using admin_blazor.Models
+@using Microsoft.EntityFrameworkCore
+@using System.Globalization
+@using System.Net.Http.Json
+@using System.Net.Http.Headers
+
+@inject AppDbContext Db
+@inject IJSRuntime JS
+@inject IConfiguration Configuration
+@inject IHttpClientFactory HttpClientFactory
+
+<PageTitle>Урок №@Id</PageTitle>
+
+<div class="container-fluid py-3">
+    <nav aria-label="Навигация" class="mb-3">
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item">
+                <a href="/">Главная</a>
+            </li>
+            <li class="breadcrumb-item">
+                <a href="/schedules">Расписание</a>
+            </li>
+            <li class="breadcrumb-item active">
+                Урок №@Id
+            </li>
+        </ol>
+    </nav>
+
+    <h3 class="mb-3">Урок №@Id</h3>
+
+    @if (isLoading)
+    {
+        <p>Загрузка данных...</p>
+    }
+    else if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <div class="alert alert-danger">@errorMessage</div>
+
+        <a class="btn btn-outline-secondary"
+        href="@($"/schedules?teacherId={reservation?.Teacher}&date={LessonDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}")">
+            Вернуться к расписанию
+        </a>
+    }
+    else if (reservation is not null)
+    {
+        @if (!string.IsNullOrWhiteSpace(successMessage))
+        {
+            <div class="alert alert-success">@successMessage</div>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(notificationMessage))
+        {
+            <div class="alert alert-warning">@notificationMessage</div>
+        }
+
+        <div class="card shadow-sm mb-3">
+            <div class="card-header">Информация об уроке</div>
+            <div class="card-body">
+                <dl class="row mb-0">
+                    <dt class="col-sm-4">Номер бронирования</dt>
+                    <dd class="col-sm-8">@reservation.Vendor</dd>
+
+                    <dt class="col-sm-4">Дата</dt>
+                    <dd class="col-sm-8">
+                        @(LessonDate.HasValue
+                            ? LessonDate.Value.ToString("dd.MM.yyyy")
+                            : "Не указана")
+                    </dd>
+
+                    <dt class="col-sm-4">Время</dt>
+                    <dd class="col-sm-8">
+                        @(LessonDate.HasValue
+                            ? LessonDate.Value.ToString("HH:mm")
+                            : "Не указано")
+                    </dd>
+
+                    <dt class="col-sm-4">Кабинет</dt>
+                    <dd class="col-sm-8">
+                        @(teacher?.Cabinet ?? "Не указан")
+                    </dd>
+
+                    <dt class="col-sm-4">Тип занятия</dt>
+                    <dd class="col-sm-8">
+                        @(reservation.For == 1
+                            ? "Индивидуальное"
+                            : reservation.For == 2
+                                ? "Групповое"
+                                : "Не указан")
+                    </dd>
+
+                    <dt class="col-sm-4">Статус</dt>
+                    <dd class="col-sm-8">
+                        @if (reservation.Status == 0)
+                        {
+                            <span class="badge bg-secondary">Отменён</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-success">Активен</span>
+                        }
+                    </dd>
+                </dl>
+            </div>
+        </div>
+
+        <div class="card shadow-sm mb-3">
+            <div class="card-header">Домашнее задание</div>
+            <div class="card-body">
+                <p class="text-muted mb-0">
+                    Раздел домашнего задания подключим к существующим
+                    таблицам homework и hwans после привязки их моделей.
+                </p>
+            </div>
+        </div>
+
+        <div class="d-flex flex-wrap gap-2 mt-3">
+            @if (reservation.Status != 0)
+            {
+                <button type="button"
+                        class="btn btn-danger"
+                        disabled="@isSaving"
+                        @onclick="CancelLessonAsync">
+                    @(isSaving ? "Отмена..." : "Отменить урок")
+                </button>
+            }
+            else
+            {
+                <span class="text-muted align-self-center">
+                    Этот урок уже отменён.
+                </span>
+            }
+
+            <a class="btn btn-outline-secondary"
+            href="@($"/schedules?teacherId={reservation?.Teacher}&date={LessonDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}")">
+                Вернуться к расписанию
+            </a>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public long Id { get; set; }
+
+    private Reserv? reservation;
+    private Teacher? teacher;
+    private User? student;
+
+    private bool isLoading = true;
+    private bool isSaving;
+
+    private string? errorMessage;
+    private string? successMessage;
+    private string? notificationMessage;
+
+    private DateTime? LessonDate =>
+        reservation?.Timecode is uint timecode
+            ? DateTimeOffset.FromUnixTimeSeconds(timecode).LocalDateTime
+            : null;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        isLoading = true;
+        errorMessage = null;
+        successMessage = null;
+        notificationMessage = null;
+        reservation = null;
+        teacher = null;
+        student = null;
+
+        try
+        {
+            reservation = await Db.Reservs
+                .AsNoTracking()
+                .SingleOrDefaultAsync(r => r.Vendor == Id);
+
+            if (reservation is null)
+            {
+                errorMessage = $"Урок с номером {Id} не найден.";
+                return;
+            }
+
+            teacher = await Db.Teachers
+                .AsNoTracking()
+                .SingleOrDefaultAsync(t => t.Id == reservation.Teacher);
+
+            if (reservation.Student.HasValue)
+            {
+                student = await Db.Users
+                    .AsNoTracking()
+                    .SingleOrDefaultAsync(
+                        u => u.Id == reservation.Student.Value);
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage =
+                $"Не удалось загрузить урок: {ex.GetBaseException().Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task CancelLessonAsync()
+    {
+        if (reservation is null ||
+            reservation.Status == 0 ||
+            isSaving)
+        {
+            return;
+        }
+
+        var confirmed = await JS.InvokeAsync<bool>(
+            "confirm",
+            "Вы уверены, что хотите отменить этот урок?");
+
+        if (!confirmed)
+            return;
+
+        isSaving = true;
+        errorMessage = null;
+        successMessage = null;
+        notificationMessage = null;
+
+        try
+        {
+            await using var transaction =
+                await Db.Database.BeginTransactionAsync(
+                    System.Data.IsolationLevel.Serializable);
+
+            var currentReservation = await Db.Reservs
+                .SingleOrDefaultAsync(r => r.Vendor == Id);
+
+            if (currentReservation is null)
+            {
+                errorMessage = "Урок не найден.";
+                return;
+            }
+
+            if (currentReservation.Status == 0)
+            {
+                reservation = currentReservation;
+                errorMessage = "Урок уже отменён. Обновите страницу.";
+                return;
+            }
+
+            var schedule = await Db.Schedules
+                .SingleOrDefaultAsync(
+                    s => s.Reserv == currentReservation.Vendor);
+
+            if (schedule is null)
+            {
+                errorMessage =
+                    "Связанный слот расписания не найден. Отмена не выполнена.";
+                return;
+            }
+
+            User? currentStudent = null;
+            Teacher? currentTeacher = null;
+            DateTime? lessonTime = null;
+            decimal refund = 0;
+
+            if (currentReservation.For == 1)
+            {
+                if (!currentReservation.Student.HasValue)
+                {
+                    errorMessage =
+                        "У индивидуального урока не указан ученик.";
+                    return;
+                }
+
+                currentStudent = await Db.Users
+                    .SingleOrDefaultAsync(
+                        u => u.Id == currentReservation.Student.Value);
+
+                currentTeacher = await Db.Teachers
+                    .SingleOrDefaultAsync(
+                        t => t.Id == currentReservation.Teacher);
+
+                if (currentStudent is null)
+                {
+                    errorMessage = "Ученик не найден. Отмена не выполнена.";
+                    return;
+                }
+
+                if (currentTeacher is null)
+                {
+                    errorMessage =
+                        "Преподаватель не найден. Отмена не выполнена.";
+                    return;
+                }
+
+                if (!currentReservation.Timecode.HasValue)
+                {
+                    errorMessage =
+                        "У урока не указано время. Отмена не выполнена.";
+                    return;
+                }
+
+                lessonTime = DateTimeOffset
+                    .FromUnixTimeSeconds(
+                        currentReservation.Timecode.Value)
+                    .LocalDateTime;
+
+                var time = lessonTime.Value.ToString(
+                    "HH:mm", CultureInfo.InvariantCulture);
+
+                if (string.CompareOrdinal(time, "00:00") >= 0 &&
+                    string.CompareOrdinal(time, "11:00") <= 0)
+                {
+                    refund = (decimal)(currentTeacher.Price1 ?? 0);
+                }
+                else if (string.CompareOrdinal(time, "12:00") >= 0 &&
+                         string.CompareOrdinal(time, "17:00") <= 0)
+                {
+                    refund = (decimal)(currentTeacher.Price2 ?? 0);
+                }
+                else if (string.CompareOrdinal(time, "18:00") >= 0 &&
+                         string.CompareOrdinal(time, "23:59") <= 0)
+                {
+                    refund = (decimal)(currentTeacher.Price3 ?? 0);
+                }
+            }
+            else if (currentReservation.For != 2)
+            {
+                errorMessage =
+                    "Неизвестный тип занятия. Отмена не выполнена.";
+                return;
+            }
+
+            currentReservation.Cancel =
+                (uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+            currentReservation.Coment = "hz";
+            currentReservation.CanseledBy = "admin";
+            currentReservation.Reason = "a1";
+            currentReservation.Status = 0;
+
+            schedule.Reserv = 0;
+
+            if (currentReservation.For == 1 && currentStudent is not null)
+            {
+                currentStudent.Balance += refund;
+            }
+
+            await Db.SaveChangesAsync();
+            await transaction.CommitAsync();
+
+            reservation = currentReservation;
+            teacher = currentTeacher ?? teacher;
+            student = currentStudent ?? student;
+
+            successMessage = currentReservation.For == 1
+                ? $"Урок отменён. Возвращено на баланс: {refund:N0} LVL."
+                : "Групповое занятие отменено. Возврат средств не предусмотрен.";
+
+            if (currentReservation.For == 1 &&
+                currentStudent is not null &&
+                currentTeacher is not null &&
+                lessonTime.HasValue)
+            {
+                notificationMessage =
+                    await SendCancellationNotificationAsync(
+                        currentStudent,
+                        currentTeacher,
+                        lessonTime.Value);
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage =
+                $"Не удалось отменить урок: {ex.GetBaseException().Message}";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task<string?> SendCancellationNotificationAsync(
+        User currentStudent,
+        Teacher currentTeacher,
+        DateTime lessonTime)
+    {
+        var token = Configuration["Whapi:Token"];
+
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            return "Урок отменён и баланс обновлён, но токен Whapi не настроен.";
+        }
+
+        if (!currentStudent.Phone.HasValue)
+        {
+            return "Урок отменён и баланс обновлён, но у ученика не указан номер телефона.";
+        }
+
+        var phone = currentStudent.Phone.Value.ToString(
+            "0", CultureInfo.InvariantCulture);
+
+        var message =
+            $"Привет, {currentStudent.Name}!\n\n" +
+            $"К сожалению, урок с преподавателем {currentTeacher.Login} " +
+            $"на {lessonTime:dd.MM.yyyy} в {lessonTime:HH:mm} " +
+            "был отменён администратором.\n\n" +
+            $"Твой баланс: {currentStudent.Balance} LVL";
+
+        try
+        {
+            var http = HttpClientFactory.CreateClient();
+
+            http.DefaultRequestHeaders.Authorization =
+                new AuthenticationHeaderValue("Bearer", token);
+
+            http.DefaultRequestHeaders.Accept.Add(
+                new MediaTypeWithQualityHeaderValue("application/json"));
+
+            var payload = new
+            {
+                typing_time = 0,
+                to = phone,
+                body = message
+            };
+
+            using var response = await http.PostAsJsonAsync(
+                "https://gate.whapi.cloud/messages/text",
+                payload);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                return
+                    $"Урок отменён и баланс обновлён, но Whapi не принял уведомление (HTTP {(int)response.StatusCode}).";
+            }
+
+            return null;
+        }
+        catch
+        {
+            return "Урок отменён и баланс обновлён, но отправить WhatsApp-уведомление не удалось. Проверьте доступность Whapi.";
+        }
+    }
+}
