@@ -19,7 +19,7 @@ obj/
 appsettings.Local.json
 appsettings.*.Local.json
 secrets.json
-
+*.gz
 # Logs
 *.log
 

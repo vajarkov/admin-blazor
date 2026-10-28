@@ -34,6 +34,8 @@
                            inputmode="tel"
                            autocomplete="username"
                            placeholder="+7 (___) ___-__-__"
+                           value="+7"
+                           maxlength="18"
                            required />
                 </div>
 
@@ -55,6 +57,76 @@
         }
     </div>
 </div>
+
+<script>
+    (() => {
+        const phone = document.getElementById('phone');
+        if (!phone) return;
+
+        function formatPhone(value) {
+            const digits = value.replace(/\D/g, '').slice(0, 11);
+            if (!digits) return '';
+
+            let result = '+' + digits[0];
+
+            if (digits.length > 1)
+                result += ' (' + digits.slice(1, 4);
+
+            if (digits.length >= 4)
+                result += ')';
+
+            if (digits.length > 4)
+                result += ' ' + digits.slice(4, 7);
+
+            if (digits.length > 7)
+                result += '-' + digits.slice(7, 9);
+
+            if (digits.length > 9)
+                result += '-' + digits.slice(9, 11);
+
+            return result;
+        }
+
+        function countDigits(value, position) {
+            return (value.slice(0, position).match(/\d/g) || []).length;
+        }
+
+        function findPosition(value, count) {
+            if (count <= 0) return 0;
+
+            let seen = 0;
+
+            for (let i = 0; i < value.length; i++) {
+                if (/\d/.test(value[i])) {
+                    seen++;
+                    if (seen === count) return i + 1;
+                }
+            }
+
+            return value.length;
+        }
+
+        phone.addEventListener('input', () => {
+            const oldValue = phone.value;
+            const oldPosition = phone.selectionStart ?? oldValue.length;
+            const digitsBeforeCursor = countDigits(oldValue, oldPosition);
+            const formatted = formatPhone(oldValue);
+
+            phone.value = formatted;
+
+            const newPosition = findPosition(
+                formatted,
+                digitsBeforeCursor
+            );
+
+            phone.setSelectionRange(newPosition, newPosition);
+        });
+
+        phone.addEventListener('focus', () => {
+            if (!phone.value) phone.value = '+7';
+        });
+    })();
+</script>
 
 @code {
     protected override void OnInitialized()

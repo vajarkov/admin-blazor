@@ -2,20 +2,28 @@
 
 <div class="admin-shell @(isSidebarCollapsed ? "sidebar-collapsed" : "") @(isMobileMenuOpen ? "mobile-menu-open" : "")">
     <aside class="admin-sidebar">
-        <NavMenu IsCollapsed="@isSidebarCollapsed" OnToggleCollapse="@ToggleSidebar" />
+        <NavMenu IsCollapsed="@isSidebarCollapsed"
+                 OnToggleCollapse="@ToggleSidebar"
+                 OnNavigate="@CloseMobileMenu" />
     </aside>
 
     @if (isMobileMenuOpen)
     {
-        <button type="button" class="admin-sidebar-backdrop" aria-label="Закрыть меню" @onclick="CloseMobileMenu">
+        <button type="button"
+                class="admin-sidebar-backdrop"
+                aria-label="Закрыть меню"
+                @onclick="CloseMobileMenu">
         </button>
     }
 
     <div class="admin-main">
         <header class="admin-topbar">
             <div class="admin-topbar-left">
-                <button type="button" class="admin-mobile-menu-button" aria-label="Открыть меню"
-                        aria-expanded="@isMobileMenuOpen" @onclick="ToggleMobileMenu">
+                <button type="button"
+                        class="admin-mobile-menu-button"
+                        aria-label="Открыть меню"
+                        aria-expanded="@isMobileMenuOpen"
+                        @onclick="ToggleMobileMenu">
                     <svg viewBox="0 0 24 24" aria-hidden="true">
                         <path d="M4 6h16M4 12h16M4 18h16" />
                     </svg>
@@ -55,6 +63,7 @@
     {
         isSidebarCollapsed = !isSidebarCollapsed;
     }
+
     private void ToggleMobileMenu()
     {
         isMobileMenuOpen = !isMobileMenuOpen;
