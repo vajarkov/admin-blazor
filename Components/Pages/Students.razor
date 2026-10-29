@@ -40,7 +40,7 @@
     }
     else
     {
-        <div class="card shadow-sm">
+        <div class="card shadow-sm" style="@(PageStudents.Count > 0 ? "width: 1200px;" : "")">
             <div class="card-body">
                 <div class="row g-3 align-items-end mb-3">
                     <div class="col-12 col-md-7 col-lg-6">
@@ -48,6 +48,7 @@
                         <input id="studentSearch"
                                class="form-control"
                                type="search"
+                               style="max-width: 320px;"
                                placeholder="Введите имя, фамилию или телефон"
                                @bind="searchText"
                                @bind:event="oninput" />
@@ -125,7 +126,16 @@
                                                 <span class="badge text-bg-secondary">Не верифицирован</span>
                                             }
                                         </td>
-                                        <td>@StudentTypeLabel(student.StudentType)</td>
+                                        <td>
+                                            @if (student.StudentType == 1)
+                                            {
+                                                <span class="badge text-bg-primary">Индивидуальный</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge text-bg-danger">Групповой</span>
+                                            }
+                                        </td>
                                         <td>
                                             <a class="btn btn-sm btn-outline-primary"
                                                href="https://student.level-english.kz/newlogin.php?user=@student.Id"

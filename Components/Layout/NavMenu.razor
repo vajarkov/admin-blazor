@@ -5,15 +5,14 @@
 @inject AuthenticationStateProvider AuthenticationStateProvider
 
 <div class="admin-nav-root @(IsCollapsed ? "admin-nav-collapsed" : "")">
+
     <div class="admin-brand">
-        <a href="/"
-           class="admin-brand-link"
-           title="Level English"
-           @onclick="OnNavigate">
-            <img src="/images/level-english-logo.svg" alt="Level English" class="admin-brand-logo" />
+        <a href="/" class="admin-brand-link" title="Level English" @onclick="OnNavigate">
+            <img src="/images/level-english-logo.svg"
+                 alt="Level English"
+                 class="admin-brand-logo" />
         </a>
 
-        
         <button type="button"
                 class="admin-collapse-button"
                 @onclick="OnToggleCollapse"
@@ -30,154 +29,244 @@
                 }
             </svg>
         </button>
-
     </div>
 
-    <div class="admin-profile">
-        <div class="admin-profile-avatar">
-            @if (!string.IsNullOrWhiteSpace(AvatarUrl))
-            {
-                <img src="@AvatarUrl" alt="Аватар пользователя" />
-            }
-            else
-            {
-                <span>@GetInitials(DisplayName)</span>
-            }
-        </div>
+    <div class="admin-profile" title="@DisplayName">
+        @if (!string.IsNullOrWhiteSpace(AvatarUrl))
+        {
+            <img src="@AvatarUrl"
+                 alt="Аватар пользователя"
+                 class="admin-avatar-image" />
+        }
+        else
+        {
+            <div class="admin-avatar" aria-hidden="true">
+                @GetInitials(DisplayName)
+            </div>
+        }
 
         <div class="admin-profile-info">
-            <span class="admin-profile-name">@DisplayName</span>
-            <span class="admin-profile-role">Администратор</span>
+            <div class="admin-profile-name">@DisplayName</div>
+            <div class="admin-profile-role">Администратор</div>
         </div>
     </div>
 
     <nav class="admin-nav" aria-label="Основная навигация">
-        <NavLink href="/students" Match="NavLinkMatch.All" class="admin-nav-link" @onclick="OnNavigate">
-            <span class="admin-nav-icon">
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M16 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                    <circle cx="10" cy="7" r="4" />
-                    <path d="M20 21v-2a4 4 0 0 0-3-3.87" />
-                    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                </svg>
-            </span>
-            <span class="admin-nav-text">Ученики</span>
-        </NavLink>
 
-        <NavLink href="/teachers" Match="NavLinkMatch.Prefix" class="admin-nav-link" @onclick="OnNavigate">
-            <span class="admin-nav-icon">
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M16 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                    <circle cx="10" cy="7" r="4" />
-                    <path d="M20 8v6" />
-                    <path d="M23 11h-6" />
-                </svg>
-            </span>
-            <span class="admin-nav-text">Преподаватели</span>
-        </NavLink>
+        <div class="admin-nav-group">
+            <div class="admin-nav-caption">ПОЛЬЗОВАТЕЛИ</div>
 
-        <NavLink href="/programs" Match="NavLinkMatch.Prefix" class="admin-nav-link" @onclick="OnNavigate">
-            <span class="admin-nav-icon">
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-                    <path d="M8 7h8M8 11h8" />
+            <NavLink class="admin-nav-link"
+                     href="/students"
+                     Match="NavLinkMatch.All"
+                     title="Студенты"
+                     @onclick="OnNavigate">
+                <svg class="admin-nav-icon" viewBox="0 0 24 24"
+                     fill="none" stroke="currentColor"
+                     stroke-width="1.7" aria-hidden="true">
+                    <circle cx="9" cy="8" r="3.5" />
+                    <path d="M2.5 20v-1.5A5.5 5.5 0 0 1 8 13h2a5.5 5.5 0 0 1 5.5 5.5V20z" />
+                    <path d="M16 4.8a3.5 3.5 0 0 1 0 6.4M18 14a5 5 0 0 1 3.5 4.8V20" />
                 </svg>
-            </span>
-            <span class="admin-nav-text">Программы</span>
-        </NavLink>
+                <span class="admin-nav-text">Студенты</span>
+            </NavLink>
 
-        <NavLink href="/Schedules" Match="NavLinkMatch.Prefix" class="admin-nav-link" @onclick="OnNavigate">
-            <span class="admin-nav-icon">
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <rect x="3" y="5" width="18" height="16" rx="2" />
-                    <path d="M16 3v4M8 3v4M3 11h18" />
-                    <path d="M8 15h2M14 15h2" />
+            <NavLink class="admin-nav-link"
+                     href="/teachers"
+                     Match="NavLinkMatch.Prefix"
+                     title="Преподаватели"
+                     @onclick="OnNavigate">
+                <svg class="admin-nav-icon" viewBox="0 0 24 24"
+                     fill="none" stroke="currentColor"
+                     stroke-width="1.7" aria-hidden="true">
+                    <circle cx="12" cy="8" r="3.5" />
+                    <path d="M5 20v-1a7 7 0 0 1 14 0v1z" />
                 </svg>
-            </span>
-            <span class="admin-nav-text">Расписание</span>
-        </NavLink>
+                <span class="admin-nav-text">Преподаватели</span>
+            </NavLink>
+        </div>
 
-        <NavLink href="/groups" Match="NavLinkMatch.Prefix" class="admin-nav-link" @onclick="OnNavigate">
-            <span class="admin-nav-icon">
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <circle cx="9" cy="8" r="3" />
-                    <path d="M3 20v-1a6 6 0 0 1 12 0v1" />
-                    <circle cx="17" cy="9" r="2.5" />
-                    <path d="M17 15a4 4 0 0 1 4 4v1" />
+        <div class="admin-nav-group">
+            <div class="admin-nav-caption">ПРОГРАММЫ</div>
+
+            <NavLink class="admin-nav-link"
+                     href="/programs"
+                     Match="NavLinkMatch.Prefix"
+                     title="Все программы"
+                     @onclick="OnNavigate">
+                <svg class="admin-nav-icon" viewBox="0 0 24 24"
+                     fill="none" stroke="currentColor"
+                     stroke-width="1.7" aria-hidden="true">
+                    <rect x="3" y="4" width="18" height="16" rx="2" />
+                    <path d="M3 9h18M8 4v5M16 4v5M8 13h3M8 16h6" />
                 </svg>
-            </span>
-            <span class="admin-nav-text">Группы</span>
-        </NavLink>
+                <span class="admin-nav-text">Все программы</span>
+            </NavLink>
 
-        <NavLink href="/subscriptions" Match="NavLinkMatch.Prefix" class="admin-nav-link" @onclick="OnNavigate">
-            <span class="admin-nav-icon">
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <rect x="3" y="5" width="18" height="14" rx="2" />
-                    <path d="M3 10h18" />
-                    <path d="M7 15h4" />
+            <NavLink class="admin-nav-link"
+                     href="/Schedules"
+                     Match="NavLinkMatch.Prefix"
+                     title="Расписание"
+                     @onclick="OnNavigate">
+                <svg class="admin-nav-icon" viewBox="0 0 24 24"
+                     fill="none" stroke="currentColor"
+                     stroke-width="1.7" aria-hidden="true">
+                    <circle cx="12" cy="12" r="9" />
+                    <path d="M12 7v5l3.5 2" />
                 </svg>
-            </span>
-            <span class="admin-nav-text">Абонементы</span>
-        </NavLink>
+                <span class="admin-nav-text">Расписание</span>
+            </NavLink>
 
-        <NavLink href="/dictionary" Match="NavLinkMatch.Prefix" class="admin-nav-link" @onclick="OnNavigate">
-            <span class="admin-nav-icon">
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v18H6.5A2.5 2.5 0 0 1 4 18.5z" />
-                    <path d="M4 18.5A2.5 2.5 0 0 1 6.5 16H20" />
-                    <path d="M8 7h8M8 11h6" />
+            <NavLink class="admin-nav-link"
+                     href="/groups"
+                     Match="NavLinkMatch.Prefix"
+                     title="Группы"
+                     @onclick="OnNavigate">
+                <svg class="admin-nav-icon" viewBox="0 0 24 24"
+                     fill="none" stroke="currentColor"
+                     stroke-width="1.7" aria-hidden="true">
+                    <rect x="3" y="4" width="8" height="7" rx="1.5" />
+                    <rect x="13" y="4" width="8" height="7" rx="1.5" />
+                    <rect x="3" y="13" width="8" height="7" rx="1.5" />
+                    <rect x="13" y="13" width="8" height="7" rx="1.5" />
                 </svg>
-            </span>
-            <span class="admin-nav-text">Словарь</span>
-        </NavLink>
+                <span class="admin-nav-text">Группы</span>
+            </NavLink>
+        </div>
 
-        <NavLink href="/master" Match="NavLinkMatch.Prefix" class="admin-nav-link" @onclick="OnNavigate">
-            <span class="admin-nav-icon">
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M12 3v3M12 18v3M3 12h3M18 12h3" />
-                    <circle cx="12" cy="12" r="7" />
-                    <circle cx="12" cy="12" r="2" />
+        <div class="admin-nav-group">
+            <div class="admin-nav-caption">ПОДПИСКИ</div>
+
+            <NavLink class="admin-nav-link"
+                     href="/subscriptions"
+                     Match="NavLinkMatch.Prefix"
+                     title="Создать новую"
+                     @onclick="OnNavigate">
+                <svg class="admin-nav-icon"
+                     viewBox="0 0 24 24"
+                     fill="none"
+                     stroke="currentColor"
+                     stroke-width="1.7"
+                     stroke-linecap="round"
+                     stroke-linejoin="round"
+                     aria-hidden="true">
+                    <rect x="4" y="4" width="16" height="16" rx="2" />
+                    <path d="M12 8v8" />
+                    <path d="M8 12h8" />
                 </svg>
-            </span>
-            <span class="admin-nav-text">Мастер</span>
-        </NavLink>
+                <span class="admin-nav-text">Создать новую</span>
+            </NavLink>
+        </div>
 
-        <NavLink href="/tests" Match="NavLinkMatch.Prefix" class="admin-nav-link" @onclick="OnNavigate">
-            <span class="admin-nav-icon">
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M9 11l3 3L22 4" />
-                    <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+        <div class="admin-nav-group">
+            <div class="admin-nav-caption">ИГРЫ</div>
+
+            <NavLink class="admin-nav-link"
+                     href="/dictionary"
+                     Match="NavLinkMatch.Prefix"
+                     title="Словарь"
+                     @onclick="OnNavigate">
+                <svg class="admin-nav-icon"
+                     viewBox="0 0 24 24"
+                     fill="none"
+                     stroke="currentColor"
+                     stroke-width="1.7"
+                     stroke-linecap="round"
+                     stroke-linejoin="round"
+                     aria-hidden="true">
+                    <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v16H6.5A2.5 2.5 0 0 0 4 21.5z" />
+                    <path d="M4 5.5v16" />
+                    <path d="M8 7h8" />
+                    <path d="M8 11h6" />
                 </svg>
-            </span>
-            <span class="admin-nav-text">Тесты</span>
-        </NavLink>
+                <span class="admin-nav-text">Словарь</span>
+            </NavLink>
 
-        <NavLink href="/home-settings" Match="NavLinkMatch.Prefix" class="admin-nav-link" @onclick="OnNavigate">
-            <span class="admin-nav-icon">
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M3 10.5L12 3l9 7.5" />
+            <NavLink class="admin-nav-link"
+                     href="/master"
+                     Match="NavLinkMatch.Prefix"
+                     title="Мастер грамотей"
+                     @onclick="OnNavigate">
+                <svg class="admin-nav-icon" viewBox="0 0 24 24"
+                     fill="none" stroke="currentColor"
+                     stroke-width="1.7" aria-hidden="true">
+                    <path d="m12 3 2.6 5.3L20.5 9l-4.3 4.2 1 5.9-5.2-2.8-5.2 2.8 1-5.9L3.5 9l5.9-.7z" />
+                </svg>
+                <span class="admin-nav-text">Мастер грамотей</span>
+            </NavLink>
+
+            <NavLink class="admin-nav-link"
+                     href="/tests"
+                     Match="NavLinkMatch.Prefix"
+                     title="Тесты"
+                     @onclick="OnNavigate">
+                <svg class="admin-nav-icon" viewBox="0 0 24 24"
+                     fill="none" stroke="currentColor"
+                     stroke-width="1.7" aria-hidden="true">
+                    <path d="M7 3h10v3H7zM6 6H4v15h16V6h-2" />
+                    <path d="m8 13 2.5 2.5L16 10" />
+                </svg>
+                <span class="admin-nav-text">Тесты</span>
+            </NavLink>
+        </div>
+
+        <div class="admin-nav-group">
+            <div class="admin-nav-caption">ПЛАТФОРМА</div>
+
+            <NavLink class="admin-nav-link"
+                     href="/home-settings"
+                     Match="NavLinkMatch.Prefix"
+                     title="Главный сайт"
+                     @onclick="OnNavigate">
+                <svg class="admin-nav-icon"
+                     viewBox="0 0 24 24"
+                     fill="none"
+                     stroke="currentColor"
+                     stroke-width="1.7"
+                     stroke-linecap="round"
+                     stroke-linejoin="round"
+                     aria-hidden="true">
+                    <path d="M3 10 12 3l9 7" />
                     <path d="M5 9v12h14V9" />
                     <path d="M9 21v-7h6v7" />
                 </svg>
-            </span>
-            <span class="admin-nav-text">Главная страница</span>
-        </NavLink>
+                <span class="admin-nav-text">Главный сайт</span>
+            </NavLink>
 
-        <NavLink href="/rules" Match="NavLinkMatch.Prefix" class="admin-nav-link" @onclick="OnNavigate">
-            <span class="admin-nav-icon">
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M4 4h16v16H4z" />
-                    <path d="M8 8h8M8 12h8M8 16h5" />
+            <NavLink class="admin-nav-link"
+                     href="/rules"
+                     Match="NavLinkMatch.Prefix"
+                     title="Правила платформы"
+                     @onclick="OnNavigate">
+                <svg class="admin-nav-icon"
+                     viewBox="0 0 24 24"
+                     fill="none"
+                     stroke="currentColor"
+                     stroke-width="1.7"
+                     stroke-linecap="round"
+                     stroke-linejoin="round"
+                     aria-hidden="true">
+                    <path d="M6 3.5h8l4 4V20a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4.5a1 1 0 0 1 1-1z" />
+                    <path d="M14 3.5V8h4" />
+                    <path d="M8 12h8" />
+                    <path d="M8 16h8" />
                 </svg>
-            </span>
-            <span class="admin-nav-text">Правила</span>
-        </NavLink>
+                <span class="admin-nav-text">Правила платформы</span>
+            </NavLink>
+        </div>
+
     </nav>
 
     <div class="admin-sidebar-footer">
-        <span class="admin-sidebar-footer-text">Level English</span>
+        <svg class="admin-nav-icon" viewBox="0 0 24 24"
+             fill="none" stroke="currentColor"
+             stroke-width="1.7" aria-hidden="true">
+            <path d="M3 10 12 3l9 7v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z" />
+            <path d="M9 21v-7h6v7" />
+        </svg>
+        <span class="admin-footer-text">Панель управления школой</span>
     </div>
+
 </div>
 
 @code {
@@ -205,10 +294,11 @@
                 ?? user.FindFirst("name")?.Value
                 ?? user.Identity.Name
                 ?? "Администратор";
-
-            AvatarUrl =
-                user.FindFirst("avatar")?.Value
-                ?? user.FindFirst("AvatarUrl")?.Value;
+            //var fileName = Path.GetFileName(user.FindFirst("avatar")?.Value.Replace('\\', '/'));
+            AvatarUrl = $"/images/user/{Uri.EscapeDataString(user.FindFirst("avatar")?.Value ?? "avatar-1t.jpg")}";
+            //AvatarUrl =
+            //    user.FindFirst("avatar")?.Value
+            //    ?? user.FindFirst("AvatarUrl")?.Value;
         }
     }
 

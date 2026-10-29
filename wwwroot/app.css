@@ -183,6 +183,7 @@ h1:focus {
 
 /* Основной каркас административной панели */
 .admin-shell {
+    
     min-height: 100vh;
     display: flex;
     background: #f4f6fa;
